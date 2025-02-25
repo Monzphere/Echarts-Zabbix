@@ -13,6 +13,7 @@ This module adds a customizable widget to Zabbix that allows creating interactiv
 ## 📊 Chart Examples
 
 ### 1. Gauge (Basic)
+![image](https://github.com/user-attachments/assets/1456485b-bb2c-4021-b7cd-2becb25b8842)
 
 ```javascript
 const field = context.panel.data.series[0].fields[0];
@@ -196,6 +197,7 @@ return {
 ```
 
 ### 5. Pie Chart
+![image](https://github.com/user-attachments/assets/505c7043-3b2b-4666-b9ea-d978080bca6e)
 
 ```javascript
 const field = context.panel.data.series[0].fields[0];
@@ -224,74 +226,6 @@ return {
             { value: field.value, name: field.name },
             { value: remaining, name: 'Remaining' }
         ]
-    }]
-};
-```
-
-### .Basic Gauge
-
-![image](https://github.com/user-attachments/assets/1456485b-bb2c-4021-b7cd-2becb25b8842)
-```javascript
-const field = context.panel.data.series[0].fields[0];
-return {
-    series: [{
-        type: 'gauge',
-        radius: '100%',
-        progress: {
-            show: true,
-            width: 18
-        },
-        axisLine: {
-            lineStyle: {
-                width: 18,
-                color: [
-                    [0.2, '#91cc75'],
-                    [0.8, '#fac858'],
-                    [1, '#ee6666']
-                ]
-            }
-        },
-        axisTick: {
-            show: false
-        },
-        splitLine: {
-            length: 12,
-            lineStyle: {
-                width: 2,
-                color: '#999'
-            }
-        },
-        axisLabel: {
-            distance: 25,
-            color: '#999',
-            fontSize: 14
-        },
-        anchor: {
-            show: true,
-            showAbove: true,
-            size: 25,
-            itemStyle: {
-                borderWidth: 10
-            }
-        },
-        title: {
-            show: true,
-            fontSize: 14,
-            color: 'black'
-        },
-        detail: {
-            valueAnimation: true,
-            fontSize: 30,
-            offsetCenter: [0, '70%'],
-            formatter: function(value) {
-                return value.toFixed(2) + ' ' + field.units;
-            },
-            color: 'black'
-        },
-        data: [{
-            value: field.value,
-            name: field.name
-        }]
     }]
 };
 ```
