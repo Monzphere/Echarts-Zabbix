@@ -12,7 +12,7 @@ This module adds a customizable widget to Zabbix that allows creating interactiv
 
 ## 📊 Chart Examples
 
-### 1. Gauge (Basic)
+### Gauge (Basic)
 ![image](https://github.com/user-attachments/assets/1456485b-bb2c-4021-b7cd-2becb25b8842)
 
 ```javascript
@@ -106,14 +106,14 @@ return {
 };
 ```
 
-### 2. Multi-Level Gauge
+### Multi-Level Gauge
 
 ```javascript
 // Note: For long configurations, you might need to put the code in a single line
 const fields=context.panel.data.series[0].fields,value=fields[0].value,atual=value,desejado=value<=70?Math.max(0,value-atual):30,naodesejado=Math.max(0,100-atual-desejado),gaugeData=[{value:atual,name:'Current',title:{offsetCenter:['0%','-30%'],color:'#5470c6'},detail:{valueAnimation:true,offsetCenter:['0%','-20%'],formatter:'{value}%',color:'#5470c6',backgroundColor:'#fff',borderRadius:10,padding:[5,10]},itemStyle:{color:'#5470c6'}},{value:desejado,name:'Desired',title:{offsetCenter:['0%','0%'],color:'#91cc75'},detail:{valueAnimation:true,offsetCenter:['0%','10%'],formatter:'{value}%',color:'#91cc75',backgroundColor:'#fff',borderRadius:10,padding:[5,10]},itemStyle:{color:'#91cc75'}},{value:naodesejado,name:'Undesired',title:{offsetCenter:['0%','30%'],color:'#fac858'},detail:{valueAnimation:true,offsetCenter:['0%','40%'],formatter:'{value}%',color:'#fac858',backgroundColor:'#fff',borderRadius:10,padding:[5,10]},itemStyle:{color:'#fac858'}}];return{backgroundColor:'transparent',series:[{type:'gauge',startAngle:90,endAngle:-270,center:['50%','50%'],radius:'90%',pointer:{show:false},progress:{show:true,overlap:false,roundCap:true,clip:false,itemStyle:{borderWidth:0}},axisLine:{lineStyle:{width:20,color:[[1,'rgba(255,255,255,0.1)']]}},splitLine:{show:false},axisTick:{show:false},axisLabel:{show:false},data:gaugeData,title:{fontSize:14,fontWeight:'normal'},detail:{width:80,height:20,fontSize:14,fontWeight:'normal',borderWidth:0}}]};
 ```
 
-### 3. Bar Chart with Gradient
+### Bar Chart with Gradient
 
 ```javascript
 const field = context.panel.data.series[0].fields[0];
@@ -156,7 +156,7 @@ return {
 };
 ```
 
-### 4. Area Chart with Gradient
+### Area Chart with Gradient
 
 ```javascript
 const field = context.panel.data.series[0].fields[0];
@@ -196,7 +196,7 @@ return {
 };
 ```
 
-### 5. Pie Chart
+### Pie Chart
 ![image](https://github.com/user-attachments/assets/505c7043-3b2b-4666-b9ea-d978080bca6e)
 
 ```javascript
