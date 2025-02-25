@@ -62,6 +62,9 @@ return {
 
 ### Liquid Chart
 
+![image](https://github.com/user-attachments/assets/581a5898-654b-4911-a50b-74c615ffe66e)
+
+
 ```javacript
 // Verifica se temos dados
 if (!context.panel.data.series || !context.panel.data.series[0] || !context.panel.data.series[0].fields) {
@@ -221,6 +224,74 @@ return {
             { value: field.value, name: field.name },
             { value: remaining, name: 'Remaining' }
         ]
+    }]
+};
+```
+
+### .Basic Gauge
+
+![image](https://github.com/user-attachments/assets/1456485b-bb2c-4021-b7cd-2becb25b8842)
+```javascript
+const field = context.panel.data.series[0].fields[0];
+return {
+    series: [{
+        type: 'gauge',
+        radius: '100%',
+        progress: {
+            show: true,
+            width: 18
+        },
+        axisLine: {
+            lineStyle: {
+                width: 18,
+                color: [
+                    [0.2, '#91cc75'],
+                    [0.8, '#fac858'],
+                    [1, '#ee6666']
+                ]
+            }
+        },
+        axisTick: {
+            show: false
+        },
+        splitLine: {
+            length: 12,
+            lineStyle: {
+                width: 2,
+                color: '#999'
+            }
+        },
+        axisLabel: {
+            distance: 25,
+            color: '#999',
+            fontSize: 14
+        },
+        anchor: {
+            show: true,
+            showAbove: true,
+            size: 25,
+            itemStyle: {
+                borderWidth: 10
+            }
+        },
+        title: {
+            show: true,
+            fontSize: 14,
+            color: 'black'
+        },
+        detail: {
+            valueAnimation: true,
+            fontSize: 30,
+            offsetCenter: [0, '70%'],
+            formatter: function(value) {
+                return value.toFixed(2) + ' ' + field.units;
+            },
+            color: 'black'
+        },
+        data: [{
+            value: field.value,
+            name: field.name
+        }]
     }]
 };
 ```
