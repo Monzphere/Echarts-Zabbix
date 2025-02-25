@@ -60,6 +60,48 @@ return {
 };
 ```
 
+### Liquid Chart
+
+```javacript
+// Verifica se temos dados
+if (!context.panel.data.series || !context.panel.data.series[0] || !context.panel.data.series[0].fields) {
+    console.error('Dados não disponíveis no formato esperado');
+    return {};
+}
+
+const field = context.panel.data.series[0].fields[0];
+
+// Log para debug
+console.log('Campo selecionado:', {
+    nome: field.name,
+    valor: field.value,
+    unidade: field.units
+});
+
+return {
+    backgroundColor: 'transparent',
+    series: [{
+        type: 'liquidFill',
+        data: [field.value / 100],
+        radius: '80%',
+        color: ['#91cc75'],
+        backgroundStyle: {
+            color: 'rgba(255, 255, 255, 0.1)'
+        },
+        label: {
+            formatter: function() {
+                return field.name + '\n' + field.value.toFixed(2) + field.units;
+            },
+            fontSize: 28,
+            color: 'black'
+        },
+        outline: {
+            show: false
+        }
+    }]
+};
+```
+
 ### 2. Multi-Level Gauge
 
 ```javascript
