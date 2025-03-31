@@ -31,8 +31,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 		$items_data = [];
 		$items_meta = [];
 
-		// Debug dos parâmetros recebidos
-		error_log('ItemIDs recebidos: ' . json_encode($this->fields_values['itemids']));
+
 
 		// Primeiro, busca os itens com informações detalhadas
 		$db_items = API::Item()->get([
@@ -43,7 +42,6 @@ class WidgetView extends CControllerDashboardWidgetView {
 			'selectHosts' => ['name']
 		]);
 
-		error_log('Items encontrados: ' . json_encode($db_items));
 
 		if ($db_items) {
 			foreach ($db_items as $itemid => $item) {
@@ -61,7 +59,6 @@ class WidgetView extends CControllerDashboardWidgetView {
 						'limit' => 1
 					]);
 
-					error_log("Histórico para item $itemid: " . json_encode($history));
 
 					if ($history) {
 						$value = $history[0]['value'];
@@ -74,11 +71,9 @@ class WidgetView extends CControllerDashboardWidgetView {
 					$raw_value = preg_replace('/[^\d.-]/', '', $value);
 					$items_data[$itemid] = $raw_value;
 
-					error_log("Valor processado para item $itemid: $raw_value (original: $value)");
 				}
 				else {
 					$items_data[$itemid] = '0';
-					error_log("Nenhum valor encontrado para item $itemid");
 				}
 
 				// Adiciona metadados do item
@@ -91,8 +86,6 @@ class WidgetView extends CControllerDashboardWidgetView {
 					'history' => $item['history'],
 					'lastclock' => $item['lastclock']
 				];
-
-				error_log("Metadados processados para item $itemid: " . json_encode($items_meta[$itemid]));
 			}
 		}
 
@@ -107,7 +100,6 @@ class WidgetView extends CControllerDashboardWidgetView {
 			]
 		];
 
-		error_log('Dados finais antes da resposta: ' . json_encode($data, JSON_PRETTY_PRINT));
 		
 		$this->setResponse(new CControllerResponseData($data));
 	}
