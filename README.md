@@ -238,4 +238,4 @@ Contributions are welcome! Please feel free to submit pull requests.
 
 ## 📄 License
 
-This project is licensed under the GNU General Public License v2.0 - see the [LICENSE](LICENSE) file for details. 
+This project is licensed under the AGPL-3.0 license
