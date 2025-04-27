@@ -24,6 +24,7 @@ namespace Modules\EchartsWidget\Actions;
 use API,
 	CControllerDashboardWidgetView,
 	CControllerResponseData;
+use Modules\EchartsWidget\Includes\WidgetForm;
 
 class WidgetView extends CControllerDashboardWidgetView {
 
@@ -31,52 +32,70 @@ class WidgetView extends CControllerDashboardWidgetView {
 		$items_data = [];
 		$items_meta = [];
 
-
-
-		// Primeiro, busca os itens com informações detalhadas
-		$db_items = API::Item()->get([
+		$options = [
 			'output' => ['itemid', 'value_type', 'name', 'units', 'lastvalue', 'lastclock', 'delay', 'history'],
-			'itemids' => $this->fields_values['itemids'],
 			'webitems' => true,
 			'preservekeys' => true,
 			'selectHosts' => ['name']
-		]);
+		];
+
+		if (!empty($this->fields_values['groupids'])) {
+			$options['groupids'] = $this->fields_values['groupids'];
+		}
+
+		if (!empty($this->fields_values['hostids'])) {
+			$options['hostids'] = $this->fields_values['hostids'];
+		}
+
+
+		if (!empty($this->fields_values['items'])) {
+			$patterns = [];
+			foreach ($this->fields_values['items'] as $pattern) {
+
+				$cleanPattern = preg_replace('/^\*:\s*/', '', $pattern);
+				$patterns[] = $cleanPattern;
+			}
+			
+
+			
+			$options['search'] = ['name' => $patterns];
+			$options['searchByAny'] = true;
+			$options['searchWildcardsEnabled'] = true;
+		}
+
+
+		if (!empty($this->fields_values['host_tags'])) {
+			$options['hostTags'] = $this->fields_values['host_tags'];
+			$options['evaltype'] = $this->fields_values['evaltype_host'];
+		}
+
+
+		if (!empty($this->fields_values['item_tags'])) {
+			$options['tags'] = $this->fields_values['item_tags'];
+			$options['evaltype'] = $this->fields_values['evaltype_item'];
+		}
+
+
+
+
+		$db_items = API::Item()->get($options);
+
 
 
 		if ($db_items) {
 			foreach ($db_items as $itemid => $item) {
-				// Usa o lastvalue do item
+	
 				$value = $item['lastvalue'];
-
-				// Se não tiver lastvalue, tenta buscar do histórico
-				if ($value === null || $value === '' || $value === '0') {
-					$history = API::History()->get([
-						'output' => ['value', 'clock'],
-						'itemids' => $itemid,
-						'history' => $item['value_type'],
-						'sortfield' => 'clock',
-						'sortorder' => ZBX_SORT_DOWN,
-						'limit' => 1
-					]);
-
-
-					if ($history) {
-						$value = $history[0]['value'];
-					}
-				}
-
-				// Converte o valor usando as unidades do item
+				
 				if ($value !== null && $value !== '') {
-					// Remove espaços e caracteres especiais, mantém apenas números, ponto e sinal
 					$raw_value = preg_replace('/[^\d.-]/', '', $value);
 					$items_data[$itemid] = $raw_value;
-
 				}
 				else {
 					$items_data[$itemid] = '0';
 				}
 
-				// Adiciona metadados do item
+
 				$items_meta[$itemid] = [
 					'name' => $item['name'],
 					'host' => $item['hosts'][0]['name'],
@@ -89,19 +108,32 @@ class WidgetView extends CControllerDashboardWidgetView {
 			}
 		}
 
+		$columns = $this->fields_values['columns'] ?? [];
+		foreach ($items_meta as $itemid => &$meta) {
+			foreach ($columns as $column) {
+				if (isset($column['item']) && $column['item'] == $itemid) {
+					$meta['name'] = $column['name'] ?? $meta['name'];
+					$meta['units'] = $column['units'] ?? $meta['units'];
+					break;
+				}
+			}
+		}
+		unset($meta);
+
 		$data = [
 			'name' => $this->getInput('name', $this->widget->getName()),
 			'body' => '<div class="chart"></div>',
 			'items_data' => $items_data,
 			'items_meta' => $items_meta,
 			'fields_values' => $this->fields_values,
+			'display_type' => $this->fields_values['display_type'] ?? WidgetForm::DISPLAY_TYPE_GAUGE,
 			'user' => [
 				'debug_mode' => $this->getDebugMode()
 			]
 		];
 
+
 		
 		$this->setResponse(new CControllerResponseData($data));
 	}
 }
-

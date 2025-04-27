@@ -4,233 +4,114 @@ This module adds a customizable widget to Zabbix that allows creating interactiv
 
 ## 🚀 Features
 
-- Support for multiple chart types
-- Configuration via JSON or JavaScript
-- Complete customization of colors, styles, and animations
+- Support for multiple chart types:
+  - Gauge
+  - Liquid Chart
+  - Pie Chart
+  - Horizontal Bar Chart
+  - Multi-level Gauge
+  - Treemap Chart
+  - Nightingale Rose Chart
+  - Funnel Chart
+  - Treemap/Sunburst Chart
+  - LLD Table
+
+- Simplified configuration through Zabbix interface
+- Automatic item unit detection
 - Real-time updates
 - Light/Dark theme support
+- Interactive and responsive tooltips
+- Interactive zoom and navigation
+- Automatic value formatting based on item units
 
-## 📊 Chart Examples
+## 📊 Chart Types
 
-### Gauge (Basic)
-![image](https://github.com/user-attachments/assets/1456485b-bb2c-4021-b7cd-2becb25b8842)
-
-```javascript
-const field = context.panel.data.series[0].fields[0];
-return {
-    series: [{
-        type: 'gauge',
-        radius: '100%',
-        progress: {
-            show: true,
-            width: 18
-        },
-        axisLine: {
-            lineStyle: {
-                width: 18,
-                color: [
-                    [0.2, '#91cc75'],  // Green up to 20%
-                    [0.8, '#fac858'],  // Yellow up to 80%
-                    [1, '#ee6666']     // Red up to 100%
-                ]
-            }
-        },
-        axisTick: { show: false },
-        splitLine: {
-            length: 12,
-            lineStyle: { width: 2, color: '#999' }
-        },
-        pointer: { show: true },
-        title: {
-            show: true,
-            fontSize: 14
-        },
-        detail: {
-            valueAnimation: true,
-            fontSize: 30,
-            offsetCenter: [0, '70%'],
-            formatter: function(value) {
-                return value.toFixed(2) + field.units;
-            }
-        },
-        data: [{
-            value: field.value,
-            name: field.name
-        }]
-    }]
-};
-```
+### Gauge
+- Displays value in a circular gauge format
+- Dynamic colors based on value
+- Support for multiple color ranges
+- Smooth value update animation
 
 ### Liquid Chart
-
-![image](https://github.com/user-attachments/assets/581a5898-654b-4911-a50b-74c615ffe66e)
-
-
-```javacript
-// Verifica se temos dados
-if (!context.panel.data.series || !context.panel.data.series[0] || !context.panel.data.series[0].fields) {
-    console.error('Dados não disponíveis no formato esperado');
-    return {};
-}
-
-const field = context.panel.data.series[0].fields[0];
-
-// Log para debug
-console.log('Campo selecionado:', {
-    nome: field.name,
-    valor: field.value,
-    unidade: field.units
-});
-
-return {
-    backgroundColor: 'transparent',
-    series: [{
-        type: 'liquidFill',
-        data: [field.value / 100],
-        radius: '80%',
-        color: ['#91cc75'],
-        backgroundStyle: {
-            color: 'rgba(255, 255, 255, 0.1)'
-        },
-        label: {
-            formatter: function() {
-                return field.name + '\n' + field.value.toFixed(2) + field.units;
-            },
-            fontSize: 28,
-            color: 'black'
-        },
-        outline: {
-            show: false
-        }
-    }]
-};
-```
-
-### Multi-Level Gauge
-
-```javascript
-// Note: For long configurations, you might need to put the code in a single line
-const fields=context.panel.data.series[0].fields,value=fields[0].value,atual=value,desejado=value<=70?Math.max(0,value-atual):30,naodesejado=Math.max(0,100-atual-desejado),gaugeData=[{value:atual,name:'Current',title:{offsetCenter:['0%','-30%'],color:'#5470c6'},detail:{valueAnimation:true,offsetCenter:['0%','-20%'],formatter:'{value}%',color:'#5470c6',backgroundColor:'#fff',borderRadius:10,padding:[5,10]},itemStyle:{color:'#5470c6'}},{value:desejado,name:'Desired',title:{offsetCenter:['0%','0%'],color:'#91cc75'},detail:{valueAnimation:true,offsetCenter:['0%','10%'],formatter:'{value}%',color:'#91cc75',backgroundColor:'#fff',borderRadius:10,padding:[5,10]},itemStyle:{color:'#91cc75'}},{value:naodesejado,name:'Undesired',title:{offsetCenter:['0%','30%'],color:'#fac858'},detail:{valueAnimation:true,offsetCenter:['0%','40%'],formatter:'{value}%',color:'#fac858',backgroundColor:'#fff',borderRadius:10,padding:[5,10]},itemStyle:{color:'#fac858'}}];return{backgroundColor:'transparent',series:[{type:'gauge',startAngle:90,endAngle:-270,center:['50%','50%'],radius:'90%',pointer:{show:false},progress:{show:true,overlap:false,roundCap:true,clip:false,itemStyle:{borderWidth:0}},axisLine:{lineStyle:{width:20,color:[[1,'rgba(255,255,255,0.1)']]}},splitLine:{show:false},axisTick:{show:false},axisLabel:{show:false},data:gaugeData,title:{fontSize:14,fontWeight:'normal'},detail:{width:80,height:20,fontSize:14,fontWeight:'normal',borderWidth:0}}]};
-```
-
+- Liquid fill visualization
+- Fluid animation
+- Dynamic colors based on value
+- Perfect for percentage representation
 
 ### Pie Chart
-![image](https://github.com/user-attachments/assets/505c7043-3b2b-4666-b9ea-d978080bca6e)
+- Pie/donut visualization
+- Support for multiple values
+- Informative labels
+- Hover interaction
 
-```javascript
-const field = context.panel.data.series[0].fields[0];
-const remaining = 100 - field.value;
-return {
-    tooltip: {
-        trigger: 'item'
-    },
-    series: [{
-        name: field.name,
-        type: 'pie',
-        radius: ['40%', '70%'],
-        avoidLabelOverlap: false,
-        itemStyle: {
-            borderRadius: 10,
-            borderColor: '#fff',
-            borderWidth: 2
-        },
-        label: {
-            show: true,
-            formatter: function(params) {
-                return params.value.toFixed(2) + field.units;
-            }
-        },
-        data: [
-            { value: field.value, name: field.name },
-            { value: remaining, name: 'Remaining' }
-        ]
-    }]
-};
-```
+### Horizontal Bar Chart
+- Horizontal bar visualization
+- Automatic value-based sorting
+- Pagination support for many items
+- Informative labels with units
 
-## 🎨 Customization
+### Multi-level Gauge
+- Multiple gauges in a single chart
+- Distinct colors for each level
+- Independent level animation
+- Ideal for comparisons
 
-### Colors
-- Use hexadecimal colors: `'#91cc75'`
-- Use gradients:
-```javascript
-new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-    { offset: 0, color: '#83bff6' },
-    { offset: 1, color: '#188df0' }
-])
-```
+### Treemap Chart
+- Hierarchical data visualization
+- Interactive zoom
+- Dynamic value-based colors
+- Breadcrumb navigation
 
-### Number Formatting
-```javascript
-// 2 decimal places
-formatter: function(value) {
-    return value.toFixed(2) + field.units;
-}
+### Nightingale Rose Chart
+- Segmented circular visualization
+- Perfect for value comparison
+- Informative tooltips
+- Interactive animation
 
-// Using context helper
-formatter: function(value) {
-    return context.helpers.formatNumber(value, 2) + field.units;
-}
-```
+### Funnel Chart
+- Funnel-shaped visualization
+- Ideal for sequential processes
+- Informative labels
+- Smooth animation
 
-### Positioning
-```javascript
-// Centered
-offsetCenter: [0, '70%']
+### Treemap/Sunburst Chart
+- Automatic alternation between views
+- Animated transition
+- Rich interaction
+- Perfect for hierarchical data
 
-// Custom grid
-grid: {
-    top: '5%',
-    left: '3%',
-    right: '4%',
-    bottom: '3%',
-    containLabel: true
-}
-```
+### LLD Table
+- Table format visualization
+- Pagination support
+- Column sorting
+- Automatic value formatting
 
-## 🔧 Available Helpers
+## 🔧 Configuration
 
-```javascript
-// Format date
-context.helpers.formatDate(timestamp)
+1. Select desired chart type
+2. Choose items to monitor
+3. The widget automatically:
+   - Detects item units
+   - Formats values appropriately
+   - Adjusts colors and scales
+   - Configures tooltips and interactions
 
-// Format number
-context.helpers.formatNumber(value, decimals)
+## 📈 Value Formatting
 
-// Format bytes
-context.helpers.formatBytes(bytes)
+The widget automatically formats values based on item units:
+- Bytes (B, KB, MB, GB, TB)
+- Percentages (%)
+- Rates per second (B/s, KB/s, etc)
+- Numeric values with appropriate precision
+- Scientific notation for very large/small values
 
-// Generate colors
-context.helpers.generateColors(count)
+## 🎨 Visual Customization
 
-// Create gradient
-context.helpers.createGradient(color)
-```
-
-## 📝 Tips and Tricks
-
-1. **Dark/Light Theme**
-   - Widget automatically adapts to Zabbix theme
-   - Use contrasting colors for better visibility
-
-2. **Responsiveness**
-   - Charts automatically resize
-   - Use percentages for relative dimensions
-
-3. **Performance**
-   - Avoid complex animations in frequent updates
-   - Use `animation: false` for better performance
-
-4. **Debug**
-   - Check browser console for detailed logs
-   - Use debug mode for additional information
-
-5. **Long Configurations**
-   - For complex charts, you might encounter a "value is too long" error
-   - In these cases, remove all line breaks and unnecessary spaces
-   - Put the entire configuration in a single line
-   - Use minification techniques to reduce code length
-   - Consider splitting complex logic into smaller parts
+- Adaptive colors based on values
+- Light/Dark themes
+- Responsive and always visible tooltips
+- Smooth interactions and animations
+- Responsive layout that adapts to widget size
 
 ## 🤝 Contributing
 

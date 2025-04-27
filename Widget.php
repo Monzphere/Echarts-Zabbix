@@ -37,4 +37,3 @@ class Widget extends CWidget {
 		];
 	}
 }
-
