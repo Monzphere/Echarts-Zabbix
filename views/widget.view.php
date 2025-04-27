@@ -34,4 +34,3 @@
 	->setVar('items_meta', $data['items_meta'])
 	->setVar('fields_values', $data['fields_values'])
 	->show();
-

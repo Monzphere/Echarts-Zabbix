@@ -1,26 +1,165 @@
-div.dashboard-widget-lesson_gauge_chart {
+/* Estilos base para o widget */
+div.dashboard-widget-echarts {
     display: grid;
     grid-template-rows: 1fr;
     padding: 0;
 }
 
-div.dashboard-widget-lesson_gauge_chart .chart {
+div.dashboard-widget-echarts .chart {
     display: grid;
     align-items: center;
     justify-items: center;
 }
 
-div.dashboard-widget-lesson_gauge_chart .chart canvas {
-    background: white;
+/* Tema Azul */
+body.blue-theme div.dashboard-widget-echarts .chart text,
+body.blue-theme div.dashboard-widget-echarts .chart .echarts-tooltip,
+body.blue-theme div.dashboard-widget-echarts .chart .echarts-legend,
+body.blue-theme div.dashboard-widget-echarts .chart .gauge-title,
+body.blue-theme div.dashboard-widget-echarts .chart .gauge-detail {
+    fill: #000000 !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
 }
 
-div.dashboard-widget-lesson_gauge_chart .description {
+/* Tema Escuro */
+body.dark-theme div.dashboard-widget-echarts .chart text,
+body.dark-theme div.dashboard-widget-echarts .chart .echarts-tooltip,
+body.dark-theme div.dashboard-widget-echarts .chart .echarts-legend,
+body.dark-theme div.dashboard-widget-echarts .chart .gauge-title,
+body.dark-theme div.dashboard-widget-echarts .chart .gauge-detail {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Estilos específicos para cada tipo de gráfico */
+div.dashboard-widget-echarts .chart canvas {
+    background: transparent;
+}
+
+div.dashboard-widget-echarts .description {
     padding-bottom: 8px;
     font-size: 1.750em;
     line-height: 1.2;
     text-align: center;
 }
 
-.dashboard-grid-widget-hidden-header div.dashboard-widget-lesson_gauge_chart .chart {
+.dashboard-grid-widget-hidden-header div.dashboard-widget-echarts .chart {
     margin-top: 8px;
 }
+
+/* Tema escuro - cores padrão */
+.echarts-widget {
+    color: #ffffff;
+}
+
+.echarts-widget .echarts {
+    color: #ffffff;
+}
+
+/* Tema azul */
+.blue-theme .echarts-widget {
+    color: #000000;
+}
+
+.blue-theme .echarts-widget .echarts {
+    color: #000000;
+}
+
+/* Estilos específicos para elementos do gráfico */
+.echarts-widget .echarts-title,
+.echarts-widget .echarts-label,
+.echarts-widget .echarts-axis-label,
+.echarts-widget .gauge-title,
+.echarts-widget .gauge-detail {
+    color: inherit !important;
+    fill: inherit !important;
+    -webkit-text-fill-color: inherit !important;
+}
+
+/* Tema escuro - cores específicas */
+.echarts-widget .gauge-current {
+    color: #5470c6;
+}
+
+.echarts-widget .gauge-desired {
+    color: #91cc75;
+}
+
+.echarts-widget .gauge-undesired {
+    color: #fac858;
+}
+
+/* Tema azul - cores específicas */
+.blue-theme .echarts-widget .gauge-current {
+    color: #5470c6;
+}
+
+.blue-theme .echarts-widget .gauge-desired {
+    color: #91cc75;
+}
+
+.blue-theme .echarts-widget .gauge-undesired {
+    color: #fac858;
+}
+
+.theme-blue .widget-echarts .chart {
+    color: #000000;
+}
+
+.theme-blue .widget-echarts .chart .title {
+    color: #000000 !important;
+}
+
+.theme-blue .widget-echarts .chart .detail {
+    color: #000000 !important;
+}
+
+.theme-dark .widget-echarts .chart {
+    color: #ffffff;
+}
+
+.theme-dark .widget-echarts .chart .title {
+    color: #ffffff !important;
+}
+
+.theme-dark .widget-echarts .chart .detail {
+    color: #ffffff !important;
+}
+
+/* Estilos específicos para o multi-gauge */
+.theme-blue .widget-echarts .chart .gauge-title {
+    color: #000000 !important;
+}
+
+.theme-blue .widget-echarts .chart .gauge-detail {
+    color: #000000 !important;
+}
+
+.theme-dark .widget-echarts .chart .gauge-title {
+    color: #ffffff !important;
+}
+
+.theme-dark .widget-echarts .chart .gauge-detail {
+    color: #ffffff !important;
+}
+
+/* Força a cor do texto no tema azul */
+.blue-theme .echarts-widget text,
+.blue-theme .echarts-widget .gauge-title text,
+.blue-theme .echarts-widget .gauge-detail text {
+    fill: #000000 !important;
+    color: #000000 !important;
+    text-fill-color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+}
+
+/* Força a cor do texto no tema escuro */
+.dark-theme .echarts-widget text,
+.dark-theme .echarts-widget .gauge-title text,
+.dark-theme .echarts-widget .gauge-detail text {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+} 
