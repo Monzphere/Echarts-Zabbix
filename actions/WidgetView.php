@@ -32,6 +32,38 @@ class WidgetView extends CControllerDashboardWidgetView {
 		$items_data = [];
 		$items_meta = [];
 
+		// Inicializar a resposta padrão vazia
+		$data = [
+			'name' => $this->getInput('name', $this->widget->getName()),
+			'body' => '<div class="chart"></div>',
+			'items_data' => $items_data,
+			'items_meta' => $items_meta,
+			'fields_values' => $this->fields_values,
+			'display_type' => $this->fields_values['display_type'] ?? WidgetForm::DISPLAY_TYPE_GAUGE,
+			'user' => [
+				'debug_mode' => $this->getDebugMode()
+			]
+		];
+
+		// Verificar se temos algum filtro de host ou grupo configurado
+		$has_host_filter = false;
+		
+		// Dashboard de template com override_hostid
+		if ($this->isTemplateDashboard() && !empty($this->fields_values['override_hostid'])) {
+			$has_host_filter = true;
+		}
+		// Dashboard normal com hostids ou groupids
+		else if (!empty($this->fields_values['hostids']) || !empty($this->fields_values['groupids'])) {
+			$has_host_filter = true;
+		}
+		
+		// Se não temos filtros, retornar dados vazios
+		if (!$has_host_filter) {
+			$this->setResponse(new CControllerResponseData($data));
+			return;
+		}
+		
+		// Continua apenas se tiver filtros configurados
 		$options = [
 			'output' => ['itemid', 'value_type', 'name', 'units', 'lastvalue', 'lastclock', 'delay', 'history'],
 			'webitems' => true,
@@ -39,14 +71,21 @@ class WidgetView extends CControllerDashboardWidgetView {
 			'selectHosts' => ['name']
 		];
 
-		if (!empty($this->fields_values['groupids'])) {
-			$options['groupids'] = $this->fields_values['groupids'];
+		// Verificar se estamos em um dashboard de template e se o override_hostid está definido
+		if ($this->isTemplateDashboard() && !empty($this->fields_values['override_hostid'])) {
+			// Em dashboard de template com override_hostid definido, usamos o host especificado
+			$options['hostids'] = $this->fields_values['override_hostid'];
 		}
+		else {
+			// Caso contrário, seguimos o fluxo normal
+			if (!empty($this->fields_values['groupids'])) {
+				$options['groupids'] = $this->fields_values['groupids'];
+			}
 
-		if (!empty($this->fields_values['hostids'])) {
-			$options['hostids'] = $this->fields_values['hostids'];
+			if (!empty($this->fields_values['hostids'])) {
+				$options['hostids'] = $this->fields_values['hostids'];
+			}
 		}
-
 
 		if (!empty($this->fields_values['items'])) {
 			$patterns = [];
@@ -55,8 +94,6 @@ class WidgetView extends CControllerDashboardWidgetView {
 				$cleanPattern = preg_replace('/^\*:\s*/', '', $pattern);
 				$patterns[] = $cleanPattern;
 			}
-			
-
 			
 			$options['search'] = ['name' => $patterns];
 			$options['searchByAny'] = true;
@@ -75,12 +112,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 			$options['evaltype'] = $this->fields_values['evaltype_item'];
 		}
 
-
-
-
 		$db_items = API::Item()->get($options);
-
-
 
 		if ($db_items) {
 			foreach ($db_items as $itemid => $item) {
@@ -120,19 +152,9 @@ class WidgetView extends CControllerDashboardWidgetView {
 		}
 		unset($meta);
 
-		$data = [
-			'name' => $this->getInput('name', $this->widget->getName()),
-			'body' => '<div class="chart"></div>',
-			'items_data' => $items_data,
-			'items_meta' => $items_meta,
-			'fields_values' => $this->fields_values,
-			'display_type' => $this->fields_values['display_type'] ?? WidgetForm::DISPLAY_TYPE_GAUGE,
-			'user' => [
-				'debug_mode' => $this->getDebugMode()
-			]
-		];
-
-
+		// Atualizar os dados com os resultados da consulta
+		$data['items_data'] = $items_data;
+		$data['items_meta'] = $items_meta;
 		
 		$this->setResponse(new CControllerResponseData($data));
 	}

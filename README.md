@@ -2,9 +2,6 @@
 
 This module adds a customizable widget to Zabbix that allows creating interactive charts using the ECharts library.
 
-![image](https://github.com/user-attachments/assets/e3c51e24-d1b8-41b1-bf88-267a114a1243)
-
-
 ## 🚀 Features
 
 - Support for multiple chart types:

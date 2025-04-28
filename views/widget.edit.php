@@ -37,9 +37,15 @@ $hostids_field = $data['templateid'] === null && array_key_exists('hostids', $da
 		])
 	: null;
 
+// Adicionar campo override_hostid para dashboard de template
+$override_hostid_field = $data['templateid'] !== null && array_key_exists('override_hostid', $data['fields'])
+	? new CWidgetFieldMultiSelectOverrideHostView($data['fields']['override_hostid'])
+	: null;
+
 $form
 	->addField($groupids_field)
-	->addField($hostids_field);
+	->addField($hostids_field)
+	->addField($override_hostid_field);
 
 // Adiciona os campos na ordem correta
 $display_type_field = null;
@@ -60,14 +66,27 @@ if (array_key_exists('display_type', $data['fields'])) {
 // Adiciona o campo de items
 if (array_key_exists('items', $data['fields'])) {
 	$items_field = new CWidgetFieldPatternSelectItemView($data['fields']['items']);
-	$items_field->setFilterPreselect($hostids_field !== null
-		? [
-			'id' => $hostids_field->getId(),
+	
+	if ($data['templateid'] === null) {
+		// Para dashboard normal, filtra por host selecionado
+		$items_field->setFilterPreselect($hostids_field !== null
+			? [
+				'id' => $hostids_field->getId(),
+				'accept' => CMultiSelect::FILTER_PRESELECT_ACCEPT_ID,
+				'submit_as' => 'hostid'
+			]
+			: []
+		);
+	}
+	else if ($override_hostid_field !== null) {
+		// Para dashboard de template, filtra pelo host de override
+		$items_field->setFilterPreselect([
+			'id' => $override_hostid_field->getId(),
 			'accept' => CMultiSelect::FILTER_PRESELECT_ACCEPT_ID,
 			'submit_as' => 'hostid'
-		]
-		: []
-	);
+		]);
+	}
+	
 	$items_field->addClass('js-item-pattern-field');
 	$form->addField($items_field);
 }
@@ -79,20 +98,61 @@ if (array_key_exists('unit_type', $data['fields'])) {
 }
 
 // Adiciona o script para controlar a visibilidade dos campos
-if ($display_type_field !== null) {
-	$form->addItem(new CScriptTag('
-		jQuery(document).ready(function($) {
-			var $displayType = $("[name=\'display_type\']");
-			var $itemPatternField = $(".js-item-pattern-field");
+$form->addItem(new CScriptTag('
+	jQuery(document).ready(function($) {
+		var $displayType = $("[name=\'display_type\']");
+		var $itemPatternField = $(".js-item-pattern-field");
+		var $groupsField = $("[name=\'groupids[]\']");
+		var $hostsField = $("[name=\'hostids[]\']");
+		var $overrideHostField = $("[name=\'override_hostid[]\']");
+		
+		// Função para verificar se há hosts ou grupos selecionados
+		function checkHostsSelection() {
+			var hasSelection = false;
 			
-			$displayType.on("change", function() {
+			// Verificar campos de grupos e hosts em dashboards normais
+			if ($groupsField.length && $groupsField.multiSelect("getData").length > 0) {
+				hasSelection = true;
+			}
+			
+			if ($hostsField.length && $hostsField.multiSelect("getData").length > 0) {
+				hasSelection = true;
+			}
+			
+			// Verificar campo de override_hostid em dashboards de template
+			if ($overrideHostField.length && $overrideHostField.multiSelect("getData").length > 0) {
+				hasSelection = true;
+			}
+			
+			// Mostrar ou esconder campo de items baseado na seleção
+			if (hasSelection) {
 				$itemPatternField.closest(".form-field-row").show();
-			});
-			
-			// Inicialização
-			$itemPatternField.closest(".form-field-row").show();
+			} else {
+				$itemPatternField.closest(".form-field-row").hide();
+			}
+		}
+		
+		// Monitora mudanças nos campos de seleção
+		if ($groupsField.length) {
+			$groupsField.on("change", checkHostsSelection);
+		}
+		
+		if ($hostsField.length) {
+			$hostsField.on("change", checkHostsSelection);
+		}
+		
+		if ($overrideHostField.length) {
+			$overrideHostField.on("change", checkHostsSelection);
+		}
+		
+		// Verificar estado inicial
+		checkHostsSelection();
+		
+		// Tipo de display também controla visibilidade
+		$displayType.on("change", function() {
+			checkHostsSelection();
 		});
-	'));
-}
+	});
+'));
 
 $form->show();

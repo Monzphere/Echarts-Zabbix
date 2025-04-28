@@ -11,6 +11,7 @@ use Zabbix\Widgets\{
 	Fields\CWidgetFieldIntegerBox,
 	Fields\CWidgetFieldMultiSelectGroup,
 	Fields\CWidgetFieldMultiSelectHost,
+	Fields\CWidgetFieldMultiSelectOverrideHost,
 	Fields\CWidgetFieldPatternSelectItem,
 	Fields\CWidgetFieldRadioButtonList,
 	Fields\CWidgetFieldSelect,
@@ -46,10 +47,18 @@ class WidgetForm extends CWidgetForm {
         )
         ->addField(
             new CWidgetFieldMultiSelectHost('hostids', _('Hosts'))
-        )
-        ->addField(
+        );
+
+        // Adicionar o campo override_hostid para quando o widget estiver em um dashboard de template
+        if ($this->isTemplateDashboard()) {
+            $this->addField(
+                (new CWidgetFieldMultiSelectOverrideHost('override_hostid', _('Host')))
+            );
+        }
+        
+        $this->addField(
             (new CWidgetFieldPatternSelectItem('items', _('Item patterns')))
-                ->setFlags(CWidgetField::FLAG_NOT_EMPTY | CWidgetField::FLAG_LABEL_ASTERISK)
+                ->setFlags(CWidgetField::FLAG_LABEL_ASTERISK)
         )
         ->addField(
             (new CWidgetFieldSelect('display_type', _('Chart Type'), [
