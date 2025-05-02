@@ -60,11 +60,63 @@ class WidgetEcharts extends CWidget {
         };
     }
 
+    /**
+     * Processa a resposta da atualização do widget
+     * @param {Object} response - A resposta da API com os dados do widget
+     */
     processUpdateResponse(response) {
         // Update internal data
         this._items_data = response.items_data || {};
         this._items_meta = response.items_meta || {};
         this._fields_values = response.fields_values || this._fields_values;
+
+        console.log("Dados recebidos:", response.items_data);
+        
+        // Processar valores em notação científica nos dados de resposta
+        if (this._items_data) {
+            Object.keys(this._items_data).forEach(itemId => {
+                const value = this._items_data[itemId];
+                
+                // Verificar se o valor está em notação científica
+                if (typeof value === 'string') {
+                    // Tratar o caso "1.83e+8 bps"
+                    const scientificWithUnitsMatch = value.match(/^(\d+\.\d+e[+-]\d+)\s*(\w+)$/i);
+                    if (scientificWithUnitsMatch) {
+                        const numValue = Number(scientificWithUnitsMatch[1]);
+                        const unitValue = scientificWithUnitsMatch[2];
+                        
+                        if (!isNaN(numValue)) {
+                            console.log(`Convertendo valor científico com unidade: ${value} -> ${numValue} [${unitValue}]`);
+                            
+                            // Atualizar o valor para seu equivalente numérico
+                            this._items_data[itemId] = numValue;
+                            
+                            // Atualizar/adicionar a unidade aos metadados
+                            if (this._items_meta[itemId]) {
+                                this._items_meta[itemId].units = unitValue;
+                                this._items_meta[itemId].originalValue = value;
+                            }
+                        }
+                    }
+                    // Tratar valor em notação científica simples
+                    else if (value.match(/^\d+\.\d+e[+-]\d+$/i)) {
+                        const numValue = Number(value);
+                        
+                        if (!isNaN(numValue)) {
+                            console.log(`Convertendo valor científico: ${value} -> ${numValue}`);
+                            
+                            // Atualizar o valor para seu equivalente numérico
+                            this._items_data[itemId] = numValue;
+                            
+                            // Armazenar o valor original nos metadados
+                            if (this._items_meta[itemId]) {
+                                this._items_meta[itemId].originalValue = value;
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         // Prepare fields for context
         const fields = [];
@@ -492,65 +544,154 @@ class WidgetEcharts extends CWidget {
                 return 'N/A';
             }
 
+            // Tratamento direto para valor em notação científica + unidade
+            if (typeof value === 'string') {
+                // Verificar padrão como "1.83e+8 bps"
+                const scientificWithUnitsMatch = value.match(/^(\d+\.\d+e[+-]\d+)\s*(\w+)$/i);
+                if (scientificWithUnitsMatch) {
+                    const numValue = Number(scientificWithUnitsMatch[1]);
+                    const unitValue = scientificWithUnitsMatch[2].toLowerCase();
+                    
+                    if (!isNaN(numValue)) {
+                        // Se a unidade for bps, usar formatação de bits
+                        if (unitValue === 'bps') {
+                            return this._formatBitsValue(numValue);
+                        }
+                        // Outras unidades científicas também podem ser processadas aqui
+                    }
+                }
+                
+                // Verificar se é apenas notação científica sem unidade
+                if (value.match(/^\d+\.\d+e[+-]\d+$/i)) {
+                    const numValue = Number(value);
+                    if (!isNaN(numValue)) {
+                        // Se temos unidades separadas, usamos elas para formatar
+                        if (units) {
+                            if (/bps/i.test(units)) {
+                                return this._formatBitsValue(numValue);
+                            }
+                        }
+                        // Sem unidades específicas, apenas formatamos o número
+                        return this._formatNumberBySize(numValue);
+                    }
+                }
+            }
+
+            // Processar valor numérico normal
             const numValue = parseFloat(value);
             if (isNaN(numValue)) {
-                return 'N/A';
+                return String(value);
             }
 
             // Se não houver unidades definidas, retorna apenas o valor formatado
             if (!units) {
-                return numValue.toFixed(2);
+                return this._formatNumberBySize(numValue);
+            }
+
+            // Processar com base nas unidades
+            const normalizedUnits = units.toLowerCase().trim();
+
+            // Caso especial para unidades bps (bits por segundo)
+            if (/bps$/i.test(normalizedUnits)) {
+                return this._formatBitsValue(numValue);
             }
 
             // Se a unidade for B, KB, MB, GB, TB ou variações, formata como bytes
-            if (/^[KMGT]?B$/i.test(units)) {
-                const sizeUnits = ['B', 'KB', 'MB', 'GB', 'TB'];
-                let unitIndex = sizeUnits.indexOf(units.toUpperCase());
-                if (unitIndex === -1) unitIndex = 0;
-                
-                let formattedValue = numValue * Math.pow(1024, unitIndex);
-                unitIndex = 0;
-                
-                while (formattedValue >= 1024 && unitIndex < sizeUnits.length - 1) {
-                    formattedValue /= 1024;
-                    unitIndex++;
-                }
-                
-                return formattedValue.toFixed(2) + ' ' + sizeUnits[unitIndex];
+            if (/^[kmgt]?b$/i.test(normalizedUnits.replace(/\s+/g, ''))) {
+                return this._formatBytesValue(numValue);
             }
 
             // Se a unidade terminar com /s, formata com as unidades apropriadas
-            if (units.endsWith('/s')) {
-                const baseUnit = units.slice(0, -2);
-                const sizeUnits = ['B/s', 'KB/s', 'MB/s', 'GB/s', 'TB/s'];
-                let unitIndex = 0;
-                let formattedValue = numValue;
-                
-                while (formattedValue >= 1024 && unitIndex < sizeUnits.length - 1) {
-                    formattedValue /= 1024;
-                    unitIndex++;
-                }
-                
-                return formattedValue.toFixed(2) + ' ' + sizeUnits[unitIndex];
+            if (normalizedUnits.endsWith('/s')) {
+                return this._formatRateValue(numValue);
             }
 
             // Se a unidade for %, mantém como percentual
-            if (units === '%') {
-                return numValue.toFixed(2) + '%';
+            if (normalizedUnits === '%' || normalizedUnits.includes('percent')) {
+                return this._formatPercentValue(numValue);
             }
 
-            // Para valores muito grandes ou muito pequenos, usa notação científica
-            if (Math.abs(numValue) >= 1000000 || Math.abs(numValue) <= 0.01) {
-                return numValue.toExponential(2) + ' ' + units;
-            }
-
-            // Para outros casos, mantém o número com 2 casas decimais e a unidade original
-            return numValue.toFixed(2) + ' ' + units;
+            // Para valores simples sem conversão especial
+            return this._formatNumberBySize(numValue) + (units ? ' ' + units : '');
 
         } catch (error) {
-            console.error('Error formatting value:', error);
-            return numValue.toFixed(2); // Retorna o valor formatado sem unidades em caso de erro
+            console.error('Error formatting value:', error, value, units);
+            return String(value) + (units ? ' ' + units : '');
         }
+    }
+    
+    // Adicionar um método específico para a tabela LLD
+    _formatLLDTableValue(value, units) {
+        // Para valores em notação científica (ex: 1.83e+8 bps)
+        if (typeof value === 'string' && value.match(/^\d+\.\d+e[+-]\d+\s+bps$/i)) {
+            const numericPart = value.split(' ')[0];
+            const numericValue = Number(numericPart);
+            if (!isNaN(numericValue)) {
+                return this._formatBitsValue(numericValue);
+            }
+        }
+        
+        // Outros casos, usar o formatador geral
+        return this._formatValueWithUnits(value, units);
+    }
+    
+    _formatNumberBySize(value) {
+        const absValue = Math.abs(value);
+        
+        if (absValue === 0) {
+            return '0';
+        } else if (absValue >= 1000000000) {
+            return (value / 1000000000).toFixed(2) + ' G';
+        } else if (absValue >= 1000000) {
+            return (value / 1000000).toFixed(2) + ' M';
+        } else if (absValue >= 1000) {
+            return (value / 1000).toFixed(2) + ' K';
+        } else if (absValue < 0.01 && absValue > 0) {
+            return value.toExponential(2);
+        } else {
+            return value.toFixed(2);
+        }
+    }
+    
+    _formatBitsValue(value) {
+        // Garantir que estamos trabalhando com um número
+        value = Number(value);
+        const absValue = Math.abs(value);
+        
+        if (absValue >= 1000000000) {
+            return (value / 1000000000).toFixed(2) + ' Gbps';
+        } else if (absValue >= 1000000) {
+            return (value / 1000000).toFixed(2) + ' Mbps';
+        } else if (absValue >= 1000) {
+            return (value / 1000).toFixed(2) + ' Kbps';
+        } else {
+            return value.toFixed(2) + ' bps';
+        }
+    }
+    
+    _formatBytesValue(value) {
+        const absValue = Math.abs(value);
+        
+        if (absValue >= 1099511627776) {  // 1024^4
+            return (value / 1099511627776).toFixed(2) + ' TB';
+        } else if (absValue >= 1073741824) {  // 1024^3
+            return (value / 1073741824).toFixed(2) + ' GB';
+        } else if (absValue >= 1048576) {  // 1024^2
+            return (value / 1048576).toFixed(2) + ' MB';
+        } else if (absValue >= 1024) {
+            return (value / 1024).toFixed(2) + ' KB';
+        } else {
+            return value.toFixed(2) + ' B';
+        }
+    }
+    
+    _formatRateValue(value) {
+        // Simplificar para usar a formatação de bits
+        return this._formatBitsValue(value);
+    }
+    
+    _formatPercentValue(value) {
+        return value.toFixed(2) + '%';
     }
 
     _createHorizontalBarChart(data) {
@@ -772,6 +913,7 @@ class WidgetEcharts extends CWidget {
                 tbody.appendChild(row);
             }
         });
+        table.appendChild(thead);
         table.appendChild(tbody);
 
         popup.appendChild(closeButton);
@@ -896,35 +1038,176 @@ class WidgetEcharts extends CWidget {
 
     _createLiquidChart(data) {
         if (!data.fields || !data.fields.length) {
+            console.error('Sem dados para criar gráfico Liquid');
             return null;
         }
 
-        const field = data.fields[0];
-        const value = parseFloat(field.value);
+        // Preparar dados para o gráfico
+        const items = data.fields;
+        const waves = [];
         
-        if (isNaN(value)) {
+        console.log("Dados para gráfico Liquid:", items);
+        
+        // Limitar a 3 itens para melhor visualização
+        const maxItems = Math.min(items.length, 3);
+        
+        for (let i = 0; i < maxItems; i++) {
+            const item = items[i];
+            const value = parseFloat(item.value);
+            
+            if (isNaN(value)) {
+                continue;
+            }
+            
+            console.log(`Item ${i}: ${item.name}, valor: ${value}, unidades: ${item.units}`);
+            
+            // Normalizar o valor para 0-1 para uso no liquid fill
+            const normalizedValue = Math.max(0, Math.min(1, value / 100));
+            
+            // Adicionar a camada com opacidade decrescente para camadas mais profundas
+            const opacity = 0.95 - (i * 0.2);
+            
+            waves.push({
+                value: normalizedValue,
+                itemStyle: {
+                    color: this._getColorByIndex(i),
+                    opacity: opacity
+                },
+                // Adicionar dados originais para o tooltip
+                originalValue: value,
+                originalName: item.name,
+                originalUnits: item.units
+            });
+        }
+        
+        if (waves.length === 0) {
+            console.error('Nenhum item válido para exibir no gráfico Liquid');
             return null;
         }
+        
+        // Remover qualquer legenda personalizada anterior
+        if (this._chart_container) {
+            const existingLegend = this._chart_container.querySelector('.liquid-legend');
+            if (existingLegend) {
+                existingLegend.remove();
+            }
+        }
+        
+        // Se tivermos apenas um item, usar configuração simplificada
+        if (waves.length === 1) {
+            const item = items[0];
+            const value = parseFloat(item.value);
+            const formattedValue = this._formatValueWithUnits(value, item.units);
+            
+            return {
+                tooltip: {
+                    formatter: (params) => {
+                        const itemData = items[0];
+                        return `${itemData.name}: ${this._formatValueWithUnits(itemData.value, itemData.units)}`;
+                    }
+                },
+                series: [{
+                    type: 'liquidFill',
+                    data: waves,
+                    radius: '80%',
+                    center: ['50%', '50%'],
+                    outline: {
+                        show: true,
+                        borderDistance: 5,
+                        itemStyle: {
+                            borderColor: '#294D99',
+                            borderWidth: 2
+                        }
+                    },
+                    backgroundStyle: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    },
+                    label: {
+                        show: true,
+                        fontSize: 30,
+                        fontWeight: 'bold',
+                        formatter: () => formattedValue,
+                        color: '#fff'
+                    },
+                    itemStyle: {
+                        shadowBlur: 30,
+                        shadowColor: 'rgba(0, 0, 0, 0.4)'
+                    }
+                }]
+            };
+        }
+        
+        // Para múltiplos itens, mostrar valor do principal no centro
+        const primaryItem = items[0];
+        const primaryValue = parseFloat(primaryItem.value);
+        const formattedValue = this._formatValueWithUnits(primaryValue, primaryItem.units);
 
-        // Calcula o valor percentual se necessário
-        let displayValue = value;
-        let formattedValue = this._formatValueWithUnits(value, field.units);
-
+        // Adicionar uma legenda para múltiplos itens
+        if (this._chart_container && waves.length > 1) {
+            // Criar legenda personalizada
+            setTimeout(() => {
+                // Garantir que o container ainda exista
+                if (!this._chart_container) return;
+                
+                // Criar a legenda
+                const legend = document.createElement('div');
+                legend.className = 'liquid-legend';
+                legend.style.cssText = `
+                    position: absolute;
+                    bottom: 10px;
+                    left: 0;
+                    right: 0;
+                    text-align: center;
+                    font-size: 12px;
+                    color: white;
+                    z-index: 10;
+                    background-color: rgba(0,0,0,0.2);
+                    padding: 5px;
+                    border-radius: 4px;
+                    pointer-events: none;
+                `;
+                
+                // Adicionar itens à legenda
+                for (let i = 0; i < items.length && i < maxItems; i++) {
+                    const item = items[i];
+                    const formattedItemValue = this._formatValueWithUnits(item.value, item.units);
+                    const color = this._getColorByIndex(i);
+                    
+                    const legendItem = document.createElement('div');
+                    legendItem.style.cssText = `
+                        display: inline-block;
+                        margin: 0 5px;
+                        white-space: nowrap;
+                    `;
+                    
+                    legendItem.innerHTML = `
+                        <span style="display: inline-block; width: 10px; height: 10px; background-color: ${color}; margin-right: 5px;"></span>
+                        <span>${item.name}: ${formattedItemValue}</span>
+                    `;
+                    
+                    legend.appendChild(legendItem);
+                }
+                
+                this._chart_container.appendChild(legend);
+            }, 100);
+        }
+        
         return {
             tooltip: {
-                formatter: () => {
-                    return `${field.name}: ${formattedValue}`;
+                formatter: (params) => {
+                    // Determinar qual item do tooltip está sendo mostrado com base no índice
+                    const waveIndex = params.dataIndex;
+                    if (waveIndex >= 0 && waveIndex < items.length) {
+                        const itemData = items[waveIndex];
+                        return `${itemData.name}: ${this._formatValueWithUnits(itemData.value, itemData.units)}`;
+                    }
+                    return "Sem dados";
                 }
             },
             series: [{
                 type: 'liquidFill',
-                data: [{
-                    value: displayValue / 100,
-                    itemStyle: {
-                        color: this._getColorByValue(displayValue, 0, 100)
-                    }
-                }],
-                radius: '90%',
+                data: waves, // Múltiplos items como camadas no mesmo gráfico
+                radius: '80%',
                 center: ['50%', '50%'],
                 outline: {
                     show: true,
@@ -934,46 +1217,127 @@ class WidgetEcharts extends CWidget {
                         borderWidth: 2
                     }
                 },
+                backgroundStyle: {
+                    color: 'rgba(0, 0, 0, 0.1)'
+                },
                 label: {
+                    show: true,
+                    position: 'inside',
                     formatter: () => formattedValue,
-                    fontSize: 30,
+                    fontSize: 28,
+                    fontWeight: 'bold',
                     color: '#fff'
                 },
-                backgroundStyle: {
-                    color: 'rgba(255, 255, 255, 0.1)'
-                },
-                itemStyle: {
-                    opacity: 0.95,
-                    shadowBlur: 50,
-                    shadowColor: 'rgba(0, 0, 0, 0.4)'
-                },
-                emphasis: {
-                    itemStyle: {
-                        opacity: 0.8
-                    }
-                }
+                amplitude: 20,
+                waveLength: '80%',
+                phase: 'auto',
+                period: 'auto',
+                direction: 'right',
+                waveAnimation: true,
+                animationEasing: 'linear',
+                animationEasingUpdate: 'linear',
+                animationDuration: 2000,
+                animationDurationUpdate: 1000
             }]
         };
     }
 
     _createPieChart(data) {
-        const field = data.fields[0];
-        if (!field) return null;
-
-        const value = parseFloat(field.value);
-        if (isNaN(value)) return null;
-
-        const remaining = 100 - value;
+        const fields = data.fields;
+        if (!fields || !fields.length) return null;
         
+        // Determinar a cor do tema atual
+        const isDarkTheme = document.body.classList.contains('dark-theme');
+        const textColor = isDarkTheme ? '#ffffff' : '#000000';
+        
+        // Preparar dados para o gráfico de pizza
+        const chartData = fields.map((field, index) => ({
+            value: parseFloat(field.value),
+            name: field.name,
+            units: field.units || '',
+            itemStyle: {
+                color: this._getColorByIndex(index)
+            }
+        })).filter(item => !isNaN(item.value));
+        
+        if (chartData.length === 0) return null;
+        
+        // Se tivermos apenas um item, mostrar como "valor vs. 100-valor"
+        if (chartData.length === 1) {
+            const item = chartData[0];
+            const remaining = 100 - item.value;
+            
+            return {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: (params) => {
+                        if (params.name === 'Remaining') {
+                            return 'Remaining: ' + remaining.toFixed(2) + '%';
+                        }
+                        return `${params.name}: ${this._formatValueWithUnits(params.value, item.units)}`;
+                    }
+                },
+                legend: {
+                    orient: 'vertical',
+                    left: 'left',
+                    data: [item.name, 'Remaining'],
+                    textStyle: {
+                        color: textColor
+                    }
+                },
+                series: [{
+                    name: item.name,
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                        borderRadius: 10,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: true,
+                        formatter: (params) => {
+                            if (params.name === 'Remaining') {
+                                return params.value.toFixed(2) + '%';
+                            }
+                            return this._formatValueWithUnits(params.value, item.units);
+                        },
+                        color: textColor
+                    },
+                    data: [
+                        { value: item.value, name: item.name, itemStyle: { color: this._getColorByIndex(0) } },
+                        { value: remaining, name: 'Remaining', itemStyle: { color: '#999' } }
+                    ]
+                }]
+            };
+        }
+        
+        // Se tivermos múltiplos itens, mostrar todos em um gráfico de pizza
         return {
             tooltip: {
-                trigger: 'item'
+                trigger: 'item',
+                formatter: (params) => {
+                    const item = chartData.find(i => i.name === params.name);
+                    if (item) {
+                        return `${params.name}: ${this._formatValueWithUnits(params.value, item.units)}`;
+                    }
+                    return `${params.name}: ${params.value}`;
+                }
+            },
+            legend: {
+                orient: 'vertical',
+                left: 'left',
+                data: chartData.map(item => item.name),
+                textStyle: {
+                    color: textColor
+                }
             },
             series: [{
-                name: field.name,
                 type: 'pie',
-                radius: ['40%', '70%'],
-                avoidLabelOverlap: false,
+                radius: ['30%', '70%'],
+                center: ['55%', '50%'],
+                roseType: false,
                 itemStyle: {
                     borderRadius: 10,
                     borderColor: '#fff',
@@ -981,14 +1345,24 @@ class WidgetEcharts extends CWidget {
                 },
                 label: {
                     show: true,
-                    formatter: function(params) {
-                        return params.value.toFixed(2) + field.units;
+                    formatter: (params) => {
+                        const item = chartData.find(i => i.name === params.name);
+                        if (item) {
+                            return this._formatValueWithUnits(params.value, item.units);
+                        }
+                        return params.value;
+                    },
+                    color: textColor
+                },
+                emphasis: {
+                    label: {
+                        show: true,
+                        fontSize: 14,
+                        fontWeight: 'bold',
+                        color: textColor
                     }
                 },
-                data: [
-                    { value: value, name: field.name },
-                    { value: remaining, name: 'Remaining' }
-                ]
+                data: chartData
             }]
         };
     }
@@ -1207,7 +1581,7 @@ class WidgetEcharts extends CWidget {
                     const item = items.find(i => i.name === params.name);
                     if (!item) return params.name;
 
-                    let value = this._formatValue(params.value);
+                    let value = this._formatValueWithUnits(params.value, item.units);
                     let unitSuffix = '';
                     
                     const unitType = parseInt(this._fields_values.unit_type || WidgetEcharts.UNIT_TYPE_NONE);
@@ -1255,7 +1629,7 @@ class WidgetEcharts extends CWidget {
                         const item = items.find(i => i.name === params.name);
                         if (!item) return params.name;
 
-                        let value = this._formatValue(params.value);
+                        let value = this._formatValueWithUnits(params.value, item.units);
                         let unitSuffix = '';
                         
                         const unitType = parseInt(this._fields_values.unit_type || WidgetEcharts.UNIT_TYPE_NONE);
@@ -1516,6 +1890,39 @@ class WidgetEcharts extends CWidget {
             }
 
             try {
+                // Verificar primeiro se é notação científica
+                if (typeof value === 'string' && value.match(/^\d+\.\d+e[+-]\d+/)) {
+                    // Encontra os dados da métrica para obter as unidades
+                    let metricData = null;
+                    for (const [entityName, metricsMap] of sortedEntities) {
+                        if (metricsMap.has(metricName)) {
+                            metricData = metricsMap.get(metricName);
+                            break;
+                        }
+                    }
+                    
+                    // Se encontrou a métrica, usa o método específico para LLD
+                    if (metricData) {
+                        return this._formatLLDTableValue(value, metricData.units);
+                    }
+                    
+                    // Se o valor parece ser "notação bps" (como 1.83e+8 bps)
+                    if (value.includes('bps')) {
+                        const parts = value.split(' ');
+                        const numValue = Number(parts[0]);
+                        if (!isNaN(numValue)) {
+                            return this._formatBitsValue(numValue);
+                        }
+                    }
+                    
+                    // Para outros valores científicos
+                    const numValue = Number(value);
+                    if (!isNaN(numValue)) {
+                        return this._formatNumberBySize(numValue);
+                    }
+                }
+                
+                // Para valores numéricos normais
                 const numValue = parseFloat(value);
                 if (isNaN(numValue)) {
                     return value;
@@ -1535,51 +1942,12 @@ class WidgetEcharts extends CWidget {
                 }
 
                 const units = metricData.units;
-
-                // Se a unidade for B, KB, MB, GB, TB ou variações, formata como bytes
-                if (/^[KMGT]?B$/i.test(units)) {
-                    const sizeUnits = ['B', 'KB', 'MB', 'GB', 'TB'];
-                    let unitIndex = sizeUnits.indexOf(units.toUpperCase());
-                    if (unitIndex === -1) unitIndex = 0;
-                    
-                    let formattedValue = numValue * Math.pow(1024, unitIndex);
-                    unitIndex = 0;
-                    
-                    while (formattedValue >= 1024 && unitIndex < sizeUnits.length - 1) {
-                        formattedValue /= 1024;
-                        unitIndex++;
-                    }
-                    
-                    return formattedValue.toFixed(2) + ' ' + sizeUnits[unitIndex];
-                }
-                // Se a unidade terminar com /s, formata com as unidades apropriadas
-                else if (units.endsWith('/s')) {
-                    const baseUnit = units.slice(0, -2);
-                    const sizeUnits = ['B/s', 'KB/s', 'MB/s', 'GB/s', 'TB/s'];
-                    let unitIndex = 0;
-                    let formattedValue = numValue;
-                    
-                    while (formattedValue >= 1024 && unitIndex < sizeUnits.length - 1) {
-                        formattedValue /= 1024;
-                        unitIndex++;
-                    }
-                    
-                    return formattedValue.toFixed(2) + ' ' + sizeUnits[unitIndex];
-                }
-                // Se a unidade for %, mantém como percentual
-                else if (units === '%') {
-                    return numValue.toFixed(2) + '%';
-                }
-                // Para valores muito grandes ou muito pequenos, usa notação científica
-                else if (Math.abs(numValue) >= 1000000 || Math.abs(numValue) <= 0.01) {
-                    return numValue.toExponential(2) + (units ? ' ' + units : '');
-                }
-                // Para outros casos, mantém o número com 2 casas decimais e a unidade original
-                else {
-                    return numValue.toFixed(2) + (units ? ' ' + units : '');
-                }
+                
+                // Usar nosso método genérico para formatação
+                return this._formatValueWithUnits(numValue, units);
+                
             } catch (error) {
-                console.error('Error formatting value:', error);
+                console.error('Error formatting LLD value:', error);
                 return 'Error';
             }
         };
@@ -1716,52 +2084,50 @@ class WidgetEcharts extends CWidget {
     }
 
     _createFunnelChart(data) {
-        if (!data.fields || !data.fields.length) {
-            return null;
-        }
-
-        // Prepare data for funnel chart
-        const chartData = data.fields.map(field => ({
+        const fields = data.fields;
+        if (!fields || !fields.length) return null;
+        
+        // Determinar a cor do tema atual
+        const isDarkTheme = document.body.classList.contains('dark-theme');
+        const textColor = isDarkTheme ? '#ffffff' : '#000000';
+        
+        // Preparar dados para o gráfico de funil
+        const chartData = fields.map((field, index) => ({
             value: parseFloat(field.value),
-            name: field.name
-        }))
-        .filter(item => !isNaN(item.value))
-        .sort((a, b) => b.value - a.value); // Sort descending by value
-
+            name: field.name,
+            units: field.units || '',
+            itemStyle: {
+                color: this._getColorByIndex(index)
+            }
+        })).filter(item => !isNaN(item.value));
+        
+        if (chartData.length === 0) return null;
+        
         return {
             tooltip: {
                 trigger: 'item',
                 formatter: (params) => {
-                    const value = this._formatValue(params.value);
-                    return `${params.seriesName}<br/>${params.name}: ${value}`;
+                    const item = chartData.find(i => i.name === params.name);
+                    if (item) {
+                        return `${params.name}: ${this._formatValueWithUnits(params.value, item.units)}`;
+                    }
+                    return `${params.name}: ${params.value}`;
                 }
             },
-            toolbox: {
-                feature: {
-                    dataView: { 
-                        readOnly: false,
-                        title: 'Data View'
-                    },
-                    restore: {
-                        title: 'Restore'
-                    },
-                    saveAsImage: {
-                        title: 'Save Image'
-                    }
-                },
-                right: '5%',
-                top: '5%'
+            legend: {
+                data: chartData.map(item => item.name),
+                textStyle: {
+                    color: textColor
+                }
             },
             series: [{
-                name: 'Metrics',
                 type: 'funnel',
                 left: '10%',
-                right: '10%',
-                top: '10%',
-                bottom: '10%',
+                top: 60,
+                bottom: 60,
                 width: '80%',
                 min: 0,
-                max: Math.max(...chartData.map(item => item.value)),
+                max: Math.max(...chartData.map(item => item.value)) * 1.1,
                 minSize: '0%',
                 maxSize: '100%',
                 sort: 'descending',
@@ -1770,18 +2136,20 @@ class WidgetEcharts extends CWidget {
                     show: true,
                     position: 'inside',
                     formatter: (params) => {
-                        const value = this._formatValue(params.value);
-                        return `${params.name}\n${value}`;
+                        const item = chartData.find(i => i.name === params.name);
+                        if (item) {
+                            return `${params.name}: ${this._formatValueWithUnits(params.value, item.units)}`;
+                        }
+                        return `${params.name}: ${params.value}`;
                     },
-                    fontSize: 12,
-                    fontWeight: 'bold',
-                    color: '#fff'
+                    color: textColor
                 },
                 labelLine: {
                     length: 10,
                     lineStyle: {
                         width: 1,
-                        type: 'solid'
+                        type: 'solid',
+                        color: textColor
                     }
                 },
                 itemStyle: {
@@ -1790,8 +2158,8 @@ class WidgetEcharts extends CWidget {
                 },
                 emphasis: {
                     label: {
-                        fontSize: 16,
-                        fontWeight: 'bold'
+                        fontSize: 14,
+                        color: textColor
                     }
                 },
                 data: chartData
@@ -1840,7 +2208,7 @@ class WidgetEcharts extends CWidget {
                 label: {
                     show: true,
                     formatter: (params) => {
-                        return params.name + '\n' + this._formatValue(params.value);
+                        return params.name + '\n' + this._formatValueWithUnits(params.value, params.data.units);
                     },
                     fontSize: 11
                 },
@@ -1884,7 +2252,7 @@ class WidgetEcharts extends CWidget {
                     formatter: (params) => {
                         const isLeaf = !params.data.children;
                         if (isLeaf) {
-                            return this._formatValue(params.value);
+                            return this._formatValueWithUnits(params.value, params.data.units);
                         }
                         return params.name.length > 15 ? params.name.substring(0, 15) + '...' : params.name;
                     },
@@ -1977,42 +2345,6 @@ class WidgetEcharts extends CWidget {
         return hierarchy.children;
     }
 
-    _formatValue(value) {
-        if (value === null || value === undefined) {
-            return 'N/A';
-        }
-
-        try {
-            const unitType = parseInt(this._fields_values.unit_type) || WidgetEcharts.UNIT_TYPE_NONE;
-            const numValue = parseFloat(value);
-            
-            if (isNaN(numValue)) {
-                return 'N/A';
-            }
-            
-            switch (unitType) {
-                case WidgetEcharts.UNIT_TYPE_PERCENTAGE:
-                    return numValue.toFixed(2) + '%';
-                case WidgetEcharts.UNIT_TYPE_BITS:
-                    const units = ['b', 'Kb', 'Mb', 'Gb', 'Tb'];
-                    let unitIndex = 0;
-                    let formattedValue = Math.abs(numValue);
-                    
-                    while (formattedValue >= 1024 && unitIndex < units.length - 1) {
-                        formattedValue /= 1024;
-                        unitIndex++;
-                    }
-                    
-                    return formattedValue.toFixed(2) + ' ' + units[unitIndex];
-                default:
-                    return numValue.toFixed(2);
-            }
-        } catch (error) {
-            console.error('Error in _formatValue:', error);
-            return 'Error';
-        }
-    }
-
     onResize() {
         super.onResize();
 
@@ -2031,5 +2363,167 @@ class WidgetEcharts extends CWidget {
         if (value >= 80) return '#ee6666';      // Vermelho para alto uso
         if (value >= 60) return '#fac858';      // Amarelo para médio uso
         return '#91cc75';                       // Verde para baixo uso
+    }
+
+    _getGraphHistory() {
+        const history = [];
+        const meta = this._items_meta;
+        const data = this._items_data;
+
+        console.log("Obtendo dados para o gráfico:");
+        console.log("Meta:", meta);
+        console.log("Data:", data);
+
+        if (!data || !meta) {
+            console.error("Dados ou metadados ausentes");
+            return history;
+        }
+
+        // Processando cada itemid presente nos dados
+        for (const itemid in data) {
+            if (!data.hasOwnProperty(itemid) || !meta.hasOwnProperty(itemid)) {
+                continue;
+            }
+
+            // Obter informações do item atual
+            const item_data = data[itemid];
+            const item_meta = meta[itemid];
+            
+            console.log(`Processando item ${itemid}:`, item_meta.name);
+
+            // Obter o último valor nos dados do item
+            let value = null;
+            let clock = null;
+
+            if (item_data.length > 0) {
+                const last_point = item_data[item_data.length - 1];
+                value = last_point.value;
+                clock = last_point.clock;
+                
+                console.log(`Item ${itemid} valor original:`, value);
+                
+                // Verificar se o valor está em notação científica e convertê-lo
+                if (typeof value === 'string' && value.match(/^\d+\.\d+e[+-]\d+/)) {
+                    console.log(`Valor em notação científica detectado: ${value}`);
+                    
+                    // Extrair a parte numérica
+                    const matches = value.match(/^(\d+\.\d+e[+-]\d+)/);
+                    if (matches && matches[1]) {
+                        const numVal = Number(matches[1]);
+                        if (!isNaN(numVal)) {
+                            value = numVal;
+                            console.log(`Valor convertido para: ${value}`);
+                        }
+                    }
+                }
+            }
+
+            // Adicionar o item ao histórico com suas informações
+            if (value !== null && clock !== null) {
+                history.push({
+                    itemid: itemid,
+                    name: item_meta.name,
+                    units: item_meta.units || '',
+                    color: item_meta.color || this._defaultColors(history.length),
+                    value: value,
+                    clock: clock
+                });
+                
+                console.log(`Item adicionado ao histórico: ${item_meta.name}, valor: ${value}, unidades: ${item_meta.units || ''}`);
+            }
+        }
+
+        // Ordenar o histórico pela ordem original dos itens
+        history.sort((a, b) => {
+            return meta[a.itemid].order - meta[b.itemid].order;
+        });
+
+        return history;
+    }
+
+    _prepareGraphData(history) {
+        if (!history) {
+            history = this._getGraphHistory();
+        }
+        
+        // Log para depuração dos dados preparados
+        console.log("Dados preparados para o gráfico:", history);
+        
+        // Verifica se há dados para processar
+        if (!history || history.length === 0) {
+            console.warn("Sem dados para mostrar no gráfico");
+            return [];
+        }
+        
+        return history;
+    }
+
+    updateGraph() {
+        console.log("Atualizando gráfico...");
+        
+        try {
+            // Limpar qualquer gráfico existente
+            if (this._echart) {
+                this._echart.dispose();
+                this._echart = null;
+            }
+            
+            // Obter o contêiner do gráfico
+            const container = this.$('[data-container="graph"]')[0];
+            if (!container) {
+                console.error("Contêiner do gráfico não encontrado");
+                return;
+            }
+            
+            // Preparar os dados para o gráfico usando nosso novo método
+            const history = this._getGraphHistory();
+            console.log("Dados para o gráfico:", history);
+            
+            // Verificar se há dados para o gráfico
+            if (!history || history.length === 0) {
+                console.warn("Sem dados para mostrar no gráfico");
+                container.innerHTML = '<div class="no-data">Sem dados disponíveis</div>';
+                return;
+            }
+            
+            // Verificar o tipo de gráfico selecionado
+            const chartType = parseInt(this._fields_values.chart_type) || 0;
+            console.log("Tipo de gráfico:", chartType);
+            
+            // Inicializar o gráfico conforme o tipo
+            this._echart = echarts.init(container);
+            
+            // Criar o gráfico conforme o tipo selecionado
+            switch (chartType) {
+                case 0: // Linha
+                    this._createLineChart(history);
+                    break;
+                case 1: // Barra
+                    this._createBarChart(history);
+                    break;
+                case 2: // Torta
+                    this._createPieChart(history);
+                    break;
+                case 3: // Gauge
+                    this._createGaugeChart(history);
+                    break;
+                case 4: // Líquido
+                    this._createLiquidChart(history);
+                    break;
+                default:
+                    this._createLineChart(history);
+            }
+            
+            // Redimensionar o gráfico se necessário
+            window.addEventListener('resize', () => {
+                if (this._echart) {
+                    this._echart.resize();
+                }
+            });
+            
+            console.log("Gráfico atualizado com sucesso");
+        } catch (error) {
+            console.error("Erro ao atualizar o gráfico:", error);
+        }
     }
 }
