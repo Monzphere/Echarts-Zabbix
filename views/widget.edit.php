@@ -54,13 +54,11 @@ if (array_key_exists('display_type', $data['fields'])) {
 	$form->addField($display_type_field);
 }
 
-// Determina o tipo de display atual
-$display_type = WidgetForm::DISPLAY_TYPE_GAUGE;
-if (array_key_exists('display_type', $data['fields'])) {
-	$field = $data['fields']['display_type'];
-	if (method_exists($field, 'getValue')) {
-		$display_type = (int) $field->getValue();
-	}
+// Adiciona o campo de tema de cores
+if (array_key_exists('color_theme', $data['fields'])) {
+	$form->addField(
+		new CWidgetFieldSelectView($data['fields']['color_theme'])
+	);
 }
 
 // Adiciona o campo de items

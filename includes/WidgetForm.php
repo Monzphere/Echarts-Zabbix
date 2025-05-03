@@ -40,6 +40,14 @@ class WidgetForm extends CWidgetForm {
     public const UNIT_TYPE_NONE = 0;
     public const UNIT_TYPE_PERCENTAGE = 1;
     public const UNIT_TYPE_BITS = 2;
+    
+    // Constantes para temas de cores
+    public const COLOR_THEME_DEFAULT = 0;
+    public const COLOR_THEME_ZABBIX = 1;
+    public const COLOR_THEME_PASTEL = 2;
+    public const COLOR_THEME_BRIGHT = 3;
+    public const COLOR_THEME_DARK = 4;
+    public const COLOR_THEME_BLUE = 5;
 
     public function addFields(): self {
         $this->addField(
@@ -74,6 +82,18 @@ class WidgetForm extends CWidgetForm {
                 self::DISPLAY_TYPE_LLD_TABLE => _('LLD Table')
             ]))
                 ->setDefault(self::DISPLAY_TYPE_GAUGE)
+                ->setFlags(CWidgetField::FLAG_NOT_EMPTY)
+        )
+        ->addField(
+            (new CWidgetFieldSelect('color_theme', _('Color Theme'), [
+                self::COLOR_THEME_DEFAULT => _('Default'),
+                self::COLOR_THEME_ZABBIX => _('Zabbix'),
+                self::COLOR_THEME_PASTEL => _('Pastel'),
+                self::COLOR_THEME_BRIGHT => _('Bright'),
+                self::COLOR_THEME_DARK => _('Dark'),
+                self::COLOR_THEME_BLUE => _('Blue Monochrome')
+            ]))
+                ->setDefault(self::COLOR_THEME_DEFAULT)
                 ->setFlags(CWidgetField::FLAG_NOT_EMPTY)
         );
 

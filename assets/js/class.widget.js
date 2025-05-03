@@ -19,6 +19,14 @@ class WidgetEcharts extends CWidget {
     static DISPLAY_TYPE_FUNNEL = 8;
     static DISPLAY_TYPE_TREEMAP_SUNBURST = 9;
     static DISPLAY_TYPE_LLD_TABLE = 10;
+    
+    // Constantes para temas de cores
+    static COLOR_THEME_DEFAULT = 0;
+    static COLOR_THEME_ZABBIX = 1;
+    static COLOR_THEME_PASTEL = 2;
+    static COLOR_THEME_BRIGHT = 3;
+    static COLOR_THEME_DARK = 4;
+    static COLOR_THEME_BLUE = 5;
 
     // Constants for trigger severity
     static TRIGGER_SEVERITY_COLORS = {
@@ -30,19 +38,87 @@ class WidgetEcharts extends CWidget {
         5: '#E45959'  // Disaster
     };
 
-    // Adicionar após as constantes estáticas
-    static DEFAULT_COLORS = [
-        '#5470c6',  // Azul
-        '#91cc75',  // Verde
-        '#fac858',  // Amarelo
-        '#ee6666',  // Vermelho
-        '#73c0de',  // Azul claro
-        '#3ba272',  // Verde escuro
-        '#fc8452',  // Laranja
-        '#9a60b4',  // Roxo
-        '#ea7ccc',  // Rosa
-        '#c23531'   // Vermelho escuro
-    ];
+    // Temas de cores disponíveis
+    static COLOR_THEMES = {
+        // Tema padrão
+        [WidgetEcharts.COLOR_THEME_DEFAULT]: [
+            '#5470c6',  // Azul
+            '#91cc75',  // Verde
+            '#fac858',  // Amarelo
+            '#ee6666',  // Vermelho
+            '#73c0de',  // Azul claro
+            '#3ba272',  // Verde escuro
+            '#fc8452',  // Laranja
+            '#9a60b4',  // Roxo
+            '#ea7ccc',  // Rosa
+            '#c23531'   // Vermelho escuro
+        ],
+        // Tema cores do Zabbix
+        [WidgetEcharts.COLOR_THEME_ZABBIX]: [
+            '#7499FF',  // Azul Informativo
+            '#FFC859',  // Amarelo Aviso
+            '#FFA059',  // Laranja Médio
+            '#E97659',  // Laranja-vermelho Alto
+            '#E45959',  // Vermelho Desastre
+            '#97AAB3',  // Cinza Não classificado
+            '#009900',  // Verde
+            '#0000EE',  // Azul escuro
+            '#AA00BB',  // Roxo
+            '#FF5500'   // Laranja vibrante
+        ],
+        // Tema de cores pastel
+        [WidgetEcharts.COLOR_THEME_PASTEL]: [
+            '#B5D8EB',  // Azul pastel
+            '#C4E0B2',  // Verde pastel
+            '#FFE699',  // Amarelo pastel
+            '#FFCCCC',  // Vermelho pastel
+            '#D4BBDD',  // Roxo pastel
+            '#F2C1D5',  // Rosa pastel
+            '#FFCBA4',  // Laranja pastel
+            '#B5EAD7',  // Menta pastel
+            '#E2F0CB',  // Verde-limão pastel
+            '#FDCFDF'   // Magenta pastel
+        ],
+        // Tema de cores brilhantes
+        [WidgetEcharts.COLOR_THEME_BRIGHT]: [
+            '#0088FF',  // Azul brilhante
+            '#00CC66',  // Verde brilhante
+            '#FFCC00',  // Amarelo brilhante
+            '#FF3333',  // Vermelho brilhante
+            '#CC33FF',  // Roxo brilhante
+            '#FF66CC',  // Rosa brilhante
+            '#FF8800',  // Laranja brilhante
+            '#00FFFF',  // Ciano brilhante
+            '#66FF33',  // Lima brilhante
+            '#FF33FF'   // Magenta brilhante
+        ],
+        // Tema de cores escuras
+        [WidgetEcharts.COLOR_THEME_DARK]: [
+            '#003366',  // Azul escuro
+            '#006633',  // Verde escuro
+            '#996633',  // Marrom escuro
+            '#993333',  // Vermelho escuro
+            '#660066',  // Roxo escuro
+            '#990033',  // Borgonha escuro
+            '#663300',  // Marrom-laranja escuro
+            '#006666',  // Verde-azulado escuro
+            '#333300',  // Verde oliva escuro
+            '#330033'   // Púrpura escuro
+        ],
+        // Tema monocromático (tons de azul)
+        [WidgetEcharts.COLOR_THEME_BLUE]: [
+            '#0A2463',  // Azul mais escuro
+            '#1E3888',  // Azul escuro
+            '#3066BE',  // Azul médio-escuro
+            '#5F9DF7',  // Azul médio
+            '#8AB6F9',  // Azul médio-claro
+            '#B6D0FA',  // Azul claro
+            '#DAE7FB',  // Azul muito claro
+            '#256EFF',  // Azul brilhante
+            '#478FFF',  // Azul-ciano
+            '#30BCED'   // Ciano
+        ]
+    };
 
     onInitialize() {
         super.onInitialize();
@@ -56,7 +132,8 @@ class WidgetEcharts extends CWidget {
             display_type: 0,
             unit_type: 0,
             echarts_config: null,
-            config_type: 0
+            config_type: 0,
+            color_theme: 0
         };
     }
 
@@ -69,8 +146,6 @@ class WidgetEcharts extends CWidget {
         this._items_data = response.items_data || {};
         this._items_meta = response.items_meta || {};
         this._fields_values = response.fields_values || this._fields_values;
-
-        console.log("Dados recebidos:", response.items_data);
         
         // Processar valores em notação científica nos dados de resposta
         if (this._items_data) {
@@ -85,9 +160,7 @@ class WidgetEcharts extends CWidget {
                         const numValue = Number(scientificWithUnitsMatch[1]);
                         const unitValue = scientificWithUnitsMatch[2];
                         
-                        if (!isNaN(numValue)) {
-                            console.log(`Convertendo valor científico com unidade: ${value} -> ${numValue} [${unitValue}]`);
-                            
+                        if (!isNaN(numValue)) {                            
                             // Atualizar o valor para seu equivalente numérico
                             this._items_data[itemId] = numValue;
                             
@@ -103,7 +176,6 @@ class WidgetEcharts extends CWidget {
                         const numValue = Number(value);
                         
                         if (!isNaN(numValue)) {
-                            console.log(`Convertendo valor científico: ${value} -> ${numValue}`);
                             
                             // Atualizar o valor para seu equivalente numérico
                             this._items_data[itemId] = numValue;
@@ -515,7 +587,15 @@ class WidgetEcharts extends CWidget {
     }
 
     _getColorByIndex(index) {
-        return WidgetEcharts.DEFAULT_COLORS[index % WidgetEcharts.DEFAULT_COLORS.length];
+        // Obter o tema de cores selecionado ou usar o padrão se não estiver definido
+        const themeType = parseInt(this._fields_values.color_theme || WidgetEcharts.COLOR_THEME_DEFAULT);
+        
+        // Obter a paleta do tema selecionado ou voltar para o padrão se o tema não existir
+        const theme = WidgetEcharts.COLOR_THEMES[themeType] || 
+                      WidgetEcharts.COLOR_THEMES[WidgetEcharts.COLOR_THEME_DEFAULT];
+        
+        // Retornar a cor baseada no índice (com rotação para índices maiores que o tamanho da paleta)
+        return theme[index % theme.length];
     }
 
     _getColorByValue(value, min, max) {
@@ -1046,7 +1126,6 @@ class WidgetEcharts extends CWidget {
         const items = data.fields;
         const waves = [];
         
-        console.log("Dados para gráfico Liquid:", items);
         
         // Limitar a 3 itens para melhor visualização
         const maxItems = Math.min(items.length, 3);
@@ -1058,8 +1137,6 @@ class WidgetEcharts extends CWidget {
             if (isNaN(value)) {
                 continue;
             }
-            
-            console.log(`Item ${i}: ${item.name}, valor: ${value}, unidades: ${item.units}`);
             
             // Normalizar o valor para 0-1 para uso no liquid fill
             const normalizedValue = Math.max(0, Math.min(1, value / 100));
@@ -1656,11 +1733,7 @@ class WidgetEcharts extends CWidget {
     }
 
     _createLLDTableChart(data) {
-        console.log('Iniciando criação da tabela LLD', {
-            data: data,
-            container: this._chart_container,
-            fields_values: this._fields_values
-        });
+
 
         if (!this._chart_container || !data.fields || !data.fields.length) {
             console.warn('No data or container available for LLD table', {
@@ -2370,9 +2443,7 @@ class WidgetEcharts extends CWidget {
         const meta = this._items_meta;
         const data = this._items_data;
 
-        console.log("Obtendo dados para o gráfico:");
-        console.log("Meta:", meta);
-        console.log("Data:", data);
+
 
         if (!data || !meta) {
             console.error("Dados ou metadados ausentes");
@@ -2389,7 +2460,7 @@ class WidgetEcharts extends CWidget {
             const item_data = data[itemid];
             const item_meta = meta[itemid];
             
-            console.log(`Processando item ${itemid}:`, item_meta.name);
+
 
             // Obter o último valor nos dados do item
             let value = null;
@@ -2398,13 +2469,10 @@ class WidgetEcharts extends CWidget {
             if (item_data.length > 0) {
                 const last_point = item_data[item_data.length - 1];
                 value = last_point.value;
-                clock = last_point.clock;
-                
-                console.log(`Item ${itemid} valor original:`, value);
+                clock = last_point.clock;               
                 
                 // Verificar se o valor está em notação científica e convertê-lo
                 if (typeof value === 'string' && value.match(/^\d+\.\d+e[+-]\d+/)) {
-                    console.log(`Valor em notação científica detectado: ${value}`);
                     
                     // Extrair a parte numérica
                     const matches = value.match(/^(\d+\.\d+e[+-]\d+)/);
@@ -2412,7 +2480,6 @@ class WidgetEcharts extends CWidget {
                         const numVal = Number(matches[1]);
                         if (!isNaN(numVal)) {
                             value = numVal;
-                            console.log(`Valor convertido para: ${value}`);
                         }
                     }
                 }
@@ -2427,9 +2494,7 @@ class WidgetEcharts extends CWidget {
                     color: item_meta.color || this._defaultColors(history.length),
                     value: value,
                     clock: clock
-                });
-                
-                console.log(`Item adicionado ao histórico: ${item_meta.name}, valor: ${value}, unidades: ${item_meta.units || ''}`);
+                });                
             }
         }
 
@@ -2444,10 +2509,7 @@ class WidgetEcharts extends CWidget {
     _prepareGraphData(history) {
         if (!history) {
             history = this._getGraphHistory();
-        }
-        
-        // Log para depuração dos dados preparados
-        console.log("Dados preparados para o gráfico:", history);
+        }       
         
         // Verifica se há dados para processar
         if (!history || history.length === 0) {
@@ -2459,7 +2521,6 @@ class WidgetEcharts extends CWidget {
     }
 
     updateGraph() {
-        console.log("Atualizando gráfico...");
         
         try {
             // Limpar qualquer gráfico existente
@@ -2477,8 +2538,6 @@ class WidgetEcharts extends CWidget {
             
             // Preparar os dados para o gráfico usando nosso novo método
             const history = this._getGraphHistory();
-            console.log("Dados para o gráfico:", history);
-            
             // Verificar se há dados para o gráfico
             if (!history || history.length === 0) {
                 console.warn("Sem dados para mostrar no gráfico");
@@ -2488,7 +2547,6 @@ class WidgetEcharts extends CWidget {
             
             // Verificar o tipo de gráfico selecionado
             const chartType = parseInt(this._fields_values.chart_type) || 0;
-            console.log("Tipo de gráfico:", chartType);
             
             // Inicializar o gráfico conforme o tipo
             this._echart = echarts.init(container);
@@ -2519,9 +2577,7 @@ class WidgetEcharts extends CWidget {
                 if (this._echart) {
                     this._echart.resize();
                 }
-            });
-            
-            console.log("Gráfico atualizado com sucesso");
+            });           
         } catch (error) {
             console.error("Erro ao atualizar o gráfico:", error);
         }
