@@ -2669,30 +2669,32 @@ class WidgetEcharts extends CWidget {
         // Set container styles specifically for temporal charts
         if (isTemporalChart) {
             legendContainer.style.cssText = `
-                padding: 6px 8px;
+                padding: 8px 10px;
+                background: ${backgroundColor};
+                border-top: 1px solid ${borderColor};
+                min-height: 50px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-wrap: nowrap;
+                gap: 10px;
+                margin-top: 230px;
+                position: relative;
+                z-index: 10;
+                box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+            `;
+        } else {
+            legendContainer.style.cssText = `
+                padding: 10px;
                 background: ${backgroundColor};
                 border-top: 1px solid ${borderColor};
                 min-height: 45px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                flex-wrap: nowrap;
-                gap: 8px;
-                margin-top: 0;
-                position: relative;
-                z-index: 10;
-            `;
-        } else {
-            legendContainer.style.cssText = `
-                padding: 8px;
-                background: ${backgroundColor};
-                border-top: 1px solid ${borderColor};
-                min-height: 40px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
                 flex-wrap: wrap;
                 gap: 12px;
+                margin-top: 5px;
             `;
         }
 
@@ -3099,7 +3101,7 @@ class WidgetEcharts extends CWidget {
             grid: {
                 left: '3%',
                 right: '3%',
-                bottom: showLegend ? '10%' : '8%', // Space for enhanced legend
+                bottom: showLegend ? '35%' : '12%', // More space for enhanced legend and time labels
                 top: '5%',
                 containLabel: true
             },
@@ -3389,7 +3391,7 @@ class WidgetEcharts extends CWidget {
             grid: {
                 left: '3%',
                 right: '3%',
-                bottom: showLegend ? '10%' : '8%', // Space for enhanced legend
+                bottom: showLegend ? '35%' : '12%', // More space for enhanced legend and time labels
                 top: '5%',
                 containLabel: true
             },
@@ -3668,7 +3670,7 @@ class WidgetEcharts extends CWidget {
             grid: {
                 left: '3%',
                 right: '4%',
-                bottom: showLegend ? '10%' : '8%',
+                bottom: showLegend ? '35%' : '12%', // More space for enhanced legend and time labels
                 top: '5%',
                 containLabel: true
             },
@@ -3749,6 +3751,12 @@ class WidgetEcharts extends CWidget {
 
         // Add enhanced legend after chart is rendered
         if (showLegend && enhanced_legend_data.length > 0) {
+            // Add temporal legend class for styling
+            const container = this._chart_container.parentElement;
+            if (container) {
+                container.classList.add('temporal-legend-active');
+            }
+            
             setTimeout(() => {
                 this._createEnhancedLegend(enhanced_legend_data);
             }, 100);
@@ -3777,20 +3785,45 @@ class WidgetEcharts extends CWidget {
         const values = fields.map(field => parseFloat(field.value));
         const minValue = Math.min(...values);
         const maxValue = Math.max(...values);
+        
+        // Get unique values and find which indices should have effects
+        const uniqueValues = [...new Set(values)];
+        const hasMultipleDistinctValues = uniqueValues.length > 1;
+        
+        // Find the first index of min and max values to avoid multiple effects on same values
+        const minValueFirstIndex = values.indexOf(minValue);
+        const maxValueFirstIndex = values.indexOf(maxValue);
 
-        // Prepare scatter data
+        // Prepare scatter data using current values only (not temporal)
         const scatterData = fields.map((field, index) => {
             const value = parseFloat(field.value);
-            const time = Date.now() + (index * 1000); // Spread over time for demo
+            const currentTime = Date.now();
             
-            // Prepare enhanced legend data
+            // Check if this is min or max value
+            const isMinValue = value === minValue;
+            const isMaxValue = value === maxValue;
+            
+            // Only the FIRST occurrence of min/max values should have effect to avoid duplicates
+            let shouldHaveEffect = false;
+            
+            if (hasMultipleDistinctValues) {
+                // If we have different values, only first min and first max should pulse
+                shouldHaveEffect = (index === minValueFirstIndex) || (index === maxValueFirstIndex);
+            } else {
+                // If all values are the same, no pulsing effect
+                shouldHaveEffect = false;
+            }
+            
+
+            
+            // Prepare enhanced legend data with current values
             enhanced_legend_data.push({
                 name: field.name,
                 color: distributedColors[index],
                 stats: {
                     last: this._formatValueWithUnits(value, field.units),
-                    min: this._formatValueWithUnits(value * 0.8, field.units),
-                    max: this._formatValueWithUnits(value * 1.2, field.units),
+                    min: this._formatValueWithUnits(value, field.units),
+                    max: this._formatValueWithUnits(value, field.units),
                     avg: this._formatValueWithUnits(value, field.units)
                 }
             });
@@ -3798,26 +3831,27 @@ class WidgetEcharts extends CWidget {
             return {
                 name: field.name,
                 host: field.host,
-                value: [time, value, value * Math.random()], // [x, y, size]
-                symbolSize: Math.max(15, Math.min(50, value / 10)),
+                value: [index, value], // [x position, y value] - simple x,y positioning
+                symbolSize: Math.max(20, Math.min(60, Math.abs(value) / 2)),
+                isMinValue: isMinValue,
+                isMaxValue: isMaxValue,
+                shouldHaveEffect: shouldHaveEffect,
                 itemStyle: {
                     color: distributedColors[index],
-                    shadowBlur: value === minValue || value === maxValue ? 15 : 5,
+                    shadowBlur: shouldHaveEffect ? 15 : 5,
                     shadowColor: distributedColors[index]
                 }
             };
         });
 
         // Separate data into effect and normal scatter points
-        const effectScatterData = scatterData.filter(item => {
-            const value = item.value[1];
-            return value === minValue || value === maxValue;
-        });
+        // Effect points: only first occurrence of min AND max values
+        const effectScatterData = scatterData.filter(item => item.shouldHaveEffect);
+        
+        // Normal points: all other values  
+        const normalScatterData = scatterData.filter(item => !item.shouldHaveEffect);
+        
 
-        const normalScatterData = scatterData.filter(item => {
-            const value = item.value[1];
-            return value !== minValue && value !== maxValue;
-        });
 
         const isDarkTheme = document.body.classList.contains('dark-theme');
         const textColor = isDarkTheme ? '#ffffff' : '#000000';
@@ -3832,7 +3866,7 @@ class WidgetEcharts extends CWidget {
                 data: normalScatterData,
                 type: 'scatter',
                 symbolSize: function (data) {
-                    return data[2] ? Math.max(15, Math.min(50, data[2])) : 20;
+                    return Math.max(20, Math.min(60, Math.abs(data[1]) / 2));
                 },
                 emphasis: {
                     scale: 1.3
@@ -3850,20 +3884,29 @@ class WidgetEcharts extends CWidget {
                 data: effectScatterData,
                 type: 'effectScatter',
                 symbolSize: function (data) {
-                    return data[2] ? Math.max(20, Math.min(60, data[2])) : 25;
+                    return Math.max(25, Math.min(70, Math.abs(data[1]) / 2));
                 },
                 showEffectOn: 'render',
                 rippleEffect: {
                     brushType: 'stroke',
-                    scale: 2.5,
-                    period: 3
+                    scale: 3.0,  // Increased scale for more visible effect
+                    period: 2.5  // Faster pulsing
+                },
+                itemStyle: {
+                    shadowBlur: 20,
+                    shadowOffsetX: 0,
+                    shadowOffsetY: 0
                 },
                 emphasis: {
-                    scale: 1.5
+                    scale: 1.8,  // Bigger emphasis
+                    itemStyle: {
+                        shadowBlur: 25
+                    }
                 },
                 animationDelay: function (idx) {
-                    return idx * 100 + 500;
-                }
+                    return idx * 150 + 300;
+                },
+                animationDuration: 1500
             });
         }
 
@@ -3882,9 +3925,23 @@ class WidgetEcharts extends CWidget {
                     const field = fields.find(f => f.name === params.data.name);
                     if (field) {
                         const value = params.data.value[1];
-                        const isMinMax = value === minValue || value === maxValue;
-                        const badge = value === minValue ? '<span style="color: #ff6b6b; font-weight: bold;">[MIN]</span>' : 
-                                     value === maxValue ? '<span style="color: #51cf66; font-weight: bold;">[MAX]</span>' : '';
+                        const isMinValue = params.data.isMinValue;
+                        const isMaxValue = params.data.isMaxValue;
+                        
+                        let badge = '';
+                        if (params.data.shouldHaveEffect) {
+                            if (isMinValue && isMaxValue && minValue === maxValue) {
+                                // Same item is both min and max (only one unique value across all data)
+                                badge = '<span style="color: #ffd43b; font-weight: bold;">[ONLY VALUE]</span>';
+                            } else if (isMinValue && isMaxValue) {
+                                // This specific item has a value that is both min and max
+                                badge = '<span style="color: #ff6b6b; font-weight: bold;">[MIN]</span> <span style="color: #51cf66; font-weight: bold;">[MAX]</span>';
+                            } else if (isMinValue) {
+                                badge = '<span style="color: #ff6b6b; font-weight: bold;">[MIN]</span>';
+                            } else if (isMaxValue) {
+                                badge = '<span style="color: #51cf66; font-weight: bold;">[MAX]</span>';
+                            }
+                        }
                         
                         return `<div style="font-weight: bold; margin-bottom: 4px;">${params.data.name} ${badge}</div>` +
                                `<div style="margin-bottom: 2px;"><strong>Host:</strong> ${params.data.host || 'Unknown'}</div>` +
@@ -3901,12 +3958,13 @@ class WidgetEcharts extends CWidget {
             grid: {
                 left: '3%',
                 right: '7%',
-                bottom: showLegend ? '10%' : '8%',
+                bottom: showLegend ? '35%' : '12%', // More space for enhanced legend and time labels
                 top: '5%',
                 containLabel: true
             },
             xAxis: {
-                type: 'time',
+                type: 'category',
+                data: fields.map(field => field.name.length > 10 ? field.name.substring(0, 10) + '...' : field.name),
                 axisLine: {
                     lineStyle: {
                         color: textColor
@@ -3914,11 +3972,8 @@ class WidgetEcharts extends CWidget {
                 },
                 axisLabel: {
                     color: textColor,
-                    fontSize: 11,
-                    formatter: (value) => {
-                        const date = new Date(value);
-                        return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    }
+                    fontSize: 10,
+                    rotate: 45
                 },
                 splitLine: {
                     show: showGrid,
@@ -3967,6 +4022,12 @@ class WidgetEcharts extends CWidget {
 
         // Add enhanced legend after chart is rendered
         if (showLegend && enhanced_legend_data.length > 0) {
+            // Add temporal legend class for styling
+            const container = this._chart_container.parentElement;
+            if (container) {
+                container.classList.add('temporal-legend-active');
+            }
+            
             setTimeout(() => {
                 this._createEnhancedLegend(enhanced_legend_data);
             }, 100);
