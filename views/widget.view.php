@@ -28,9 +28,17 @@
 
 (new CWidgetView($data))
 	->addItem(
-		(new CDiv())->addClass('chart')
+		(new CDiv())
+			->addClass('echarts-container')
+			->addItem(
+				(new CDiv())->addClass('chart')
+			)
+			->addItem(
+				(new CDiv())->addClass('chart-legend-container')
+			)
 	)
 	->setVar('items_data', $data['items_data'])
 	->setVar('items_meta', $data['items_meta'])
+	->setVar('items_history', $data['items_history'] ?? [])
 	->setVar('fields_values', $data['fields_values'])
 	->show();

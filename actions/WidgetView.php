@@ -152,10 +152,166 @@ class WidgetView extends CControllerDashboardWidgetView {
 		}
 		unset($meta);
 
+		// Verificar se é um gráfico temporal e buscar dados históricos
+		$display_type = $this->fields_values['display_type'] ?? WidgetForm::DISPLAY_TYPE_GAUGE;
+		if ($display_type == WidgetForm::DISPLAY_TYPE_TEMPORAL_LINE || 
+			$display_type == WidgetForm::DISPLAY_TYPE_TEMPORAL_AREA ||
+			$display_type == WidgetForm::DISPLAY_TYPE_AREA_RAINFALL) {
+			
+			$items_history = $this->getHistoricalData($db_items);
+			$data['items_history'] = $items_history;
+		}
+
 		// Atualizar os dados com os resultados da consulta
 		$data['items_data'] = $items_data;
 		$data['items_meta'] = $items_meta;
+		$data['info'] = $this->makeWidgetInfo();
 		
 		$this->setResponse(new CControllerResponseData($data));
+	}
+
+	/**
+	 * Get historical data for temporal charts
+	 * @param array $items Items array from API
+	 * @return array Historical data
+	 */
+	private function getHistoricalData(array $items): array {
+		if (empty($items)) {
+			return [];
+		}
+
+		// Get time period from widget configuration
+		$time_period = $this->fields_values['time_period'] ?? [];
+		
+		// Handle different time period formats from CWidgetFieldTimePeriod
+		if (!empty($time_period)) {
+			// Check if it's already processed timestamps
+			if (isset($time_period['from_ts']) && isset($time_period['to_ts'])) {
+				$time_from = $time_period['from_ts'];
+				$time_till = $time_period['to_ts'];
+			}
+			// Check for string format from/to
+			elseif (isset($time_period['from']) && isset($time_period['to'])) {
+				$time_from = $time_period['from'];
+				$time_till = $time_period['to'];
+				
+				// Convert strings to timestamps
+				if (is_string($time_from)) {
+					$time_from = strtotime($time_from);
+					if ($time_from === false) {
+						$time_from = time() - 3600; // fallback to 1 hour ago
+					}
+				}
+				if (is_string($time_till)) {
+					$time_till = strtotime($time_till);
+					if ($time_till === false) {
+						$time_till = time(); // fallback to now
+					}
+				}
+			}
+			// Handle dashboard time filter integration
+			else {
+				$time_till = time();
+				$time_from = $time_till - 3600; // Default to 1 hour
+			}
+		} else {
+			// Default to last hour if no time period is set
+			$time_till = time();
+			$time_from = $time_till - 3600;
+		}
+
+		// Ensure we have valid timestamps
+		if (!is_numeric($time_from) || !is_numeric($time_till)) {
+			$time_till = time();
+			$time_from = $time_till - 3600;
+		}
+
+		$history_data = [];
+
+		foreach ($items as $itemid => $item) {
+			// Determine history table based on value type
+			$history_table = $this->getHistoryTable($item['value_type']);
+			
+			// Get history data via API
+			$history_options = [
+				'output' => ['clock', 'value'],
+				'itemids' => [$itemid],
+				'time_from' => $time_from,
+				'time_till' => $time_till,
+				'sortfield' => 'clock',
+				'sortorder' => 'ASC',
+				'limit' => 1000 // Limit to prevent memory issues
+			];
+
+			try {
+				$item_history = API::History()->get($history_options);
+				
+				if (!empty($item_history)) {
+					$history_data[$itemid] = array_map(function($point) {
+						return [
+							'clock' => (int)$point['clock'],
+							'value' => is_numeric($point['value']) ? (float)$point['value'] : $point['value']
+						];
+					}, $item_history);
+				} else {
+					$history_data[$itemid] = [];
+				}
+			} catch (Exception $e) {
+				
+				$history_data[$itemid] = [];
+			}
+		}
+
+		return $history_data;
+	}
+
+	/**
+	 * Get appropriate history table based on value type
+	 * @param int $value_type Item value type
+	 * @return int History table identifier
+	 */
+	private function getHistoryTable(int $value_type): int {
+		// Value types mapping to history tables
+		// 0 - float, 1 - character, 2 - log, 3 - integer, 4 - text
+		switch ($value_type) {
+			case ITEM_VALUE_TYPE_FLOAT:
+				return 0; // history
+			case ITEM_VALUE_TYPE_UINT64:
+				return 3; // history_uint
+			case ITEM_VALUE_TYPE_STR:
+				return 1; // history_str
+			case ITEM_VALUE_TYPE_LOG:
+				return 2; // history_log
+			case ITEM_VALUE_TYPE_TEXT:
+				return 4; // history_text
+			default:
+				return 0; // Default to float history
+		}
+	}
+
+	/**
+	 * Make widget specific info to show in widget's header.
+	 */
+	private function makeWidgetInfo(): array {
+		$info = [];
+
+		// Show time period info for temporal charts
+		$display_type = $this->fields_values['display_type'] ?? WidgetForm::DISPLAY_TYPE_GAUGE;
+		if (($display_type == WidgetForm::DISPLAY_TYPE_TEMPORAL_LINE || 
+			 $display_type == WidgetForm::DISPLAY_TYPE_TEMPORAL_AREA ||
+			 $display_type == WidgetForm::DISPLAY_TYPE_AREA_RAINFALL) &&
+			!empty($this->fields_values['time_period']) &&
+			isset($this->fields_values['time_period']['from']) &&
+			isset($this->fields_values['time_period']['to'])) {
+			
+			$info[] = [
+				'icon' => ZBX_ICON_TIME_PERIOD,
+				'hint' => relativeDateToText($this->fields_values['time_period']['from'],
+					$this->fields_values['time_period']['to']
+				)
+			];
+		}
+
+		return $info;
 	}
 }

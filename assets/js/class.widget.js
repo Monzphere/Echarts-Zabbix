@@ -19,14 +19,12 @@ class WidgetEcharts extends CWidget {
     static DISPLAY_TYPE_FUNNEL = 8;
     static DISPLAY_TYPE_TREEMAP_SUNBURST = 9;
     static DISPLAY_TYPE_LLD_TABLE = 10;
+    static DISPLAY_TYPE_TEMPORAL_LINE = 11;
+    static DISPLAY_TYPE_TEMPORAL_AREA = 12;
+    static DISPLAY_TYPE_AREA_RAINFALL = 13;
+    static DISPLAY_TYPE_SCATTER_EFFECT = 14;
     
-    // Constantes para temas de cores
-    static COLOR_THEME_DEFAULT = 0;
-    static COLOR_THEME_ZABBIX = 1;
-    static COLOR_THEME_PASTEL = 2;
-    static COLOR_THEME_BRIGHT = 3;
-    static COLOR_THEME_DARK = 4;
-    static COLOR_THEME_BLUE = 5;
+
 
     // Constants for trigger severity
     static TRIGGER_SEVERITY_COLORS = {
@@ -128,12 +126,17 @@ class WidgetEcharts extends CWidget {
         this._chart = null;
         this._items_data = {};
         this._items_meta = {};
+        this._items_history = {};
         this._fields_values = {
             display_type: 0,
             unit_type: 0,
             echarts_config: null,
             config_type: 0,
-            color_theme: 0
+            color_theme: 0,
+            time_period: {from: 'now-1h', to: 'now'},
+            show_legend: true,
+            show_grid: true,
+            smooth_lines: false
         };
     }
 
@@ -145,6 +148,7 @@ class WidgetEcharts extends CWidget {
         // Update internal data
         this._items_data = response.items_data || {};
         this._items_meta = response.items_meta || {};
+        this._items_history = response.items_history || {};
         this._fields_values = response.fields_values || this._fields_values;
         
         // Processar valores em notação científica nos dados de resposta
@@ -232,7 +236,8 @@ class WidgetEcharts extends CWidget {
             },
             zabbix: {
                 items: {...this._items_data},
-                items_meta: {...this._items_meta}
+                items_meta: {...this._items_meta},
+                items_history: {...this._items_history}
             },
             helpers: {
                 formatDate: (timestamp) => {
@@ -302,7 +307,7 @@ class WidgetEcharts extends CWidget {
 
                 // Register events
                 this._chart.on('click', (params) => {
-                    console.log('Click on graph:', params);
+                    
                 });
 
                 this._resizeChart();
@@ -386,7 +391,8 @@ class WidgetEcharts extends CWidget {
                     options = this._createGaugeChart(data);
                     break;
                 case WidgetEcharts.DISPLAY_TYPE_LIQUID:
-                    options = this._createLiquidChart(data);
+                    
+                    options = this._createGaugeChart(data);
                     break;
                 case WidgetEcharts.DISPLAY_TYPE_PIE:
                     options = this._createPieChart(data);
@@ -405,6 +411,18 @@ class WidgetEcharts extends CWidget {
                     break;
                 case WidgetEcharts.DISPLAY_TYPE_LLD_TABLE:
                     options = this._createLLDTableChart(data);
+                    break;
+                case WidgetEcharts.DISPLAY_TYPE_TEMPORAL_LINE:
+                    options = this._createTemporalLineChart(data);
+                    break;
+                case WidgetEcharts.DISPLAY_TYPE_TEMPORAL_AREA:
+                    options = this._createTemporalAreaChart(data);
+                    break;
+                case WidgetEcharts.DISPLAY_TYPE_AREA_RAINFALL:
+                    options = this._createAreaRainfallChart(data);
+                    break;
+                case WidgetEcharts.DISPLAY_TYPE_SCATTER_EFFECT:
+                    options = this._createScatterEffectChart(data);
                     break;
                 default:
                     console.error('Unsupported chart type:', displayType);
@@ -434,12 +452,29 @@ class WidgetEcharts extends CWidget {
             // Limpa eventos e handlers antigos antes de atualizar
             this._chart.off();
             
+            // Add temporal class for styling
+            if (displayType === WidgetEcharts.DISPLAY_TYPE_TEMPORAL_LINE || 
+                displayType === WidgetEcharts.DISPLAY_TYPE_TEMPORAL_AREA) {
+                this._chart_container.classList.add('temporal');
+            } else {
+                this._chart_container.classList.remove('temporal');
+            }
+
             // Atualiza o gráfico com as novas opções
+            
             this._chart.setOption(finalOptions, true);
+            
+            // Log para verificar se o chart foi atualizado corretamente
+            setTimeout(() => {
+                
+                if (displayType === WidgetEcharts.DISPLAY_TYPE_LIQUID) {
+                    
+                }
+            }, 100);
             
             // Reregistra os eventos necessários
             this._chart.on('click', (params) => {
-                console.log('Click on graph:', params);
+                
             });
         }
         catch (error) {
@@ -587,15 +622,199 @@ class WidgetEcharts extends CWidget {
     }
 
     _getColorByIndex(index) {
-        // Obter o tema de cores selecionado ou usar o padrão se não estiver definido
+        // Verificar se há cor principal definida
+        const primaryColor = this._getPrimaryColor();
+        
+        if (primaryColor) {
+            // Se há cor principal, gerar variações baseadas nela para múltiplas séries
+            if (index === 0) {
+                return primaryColor; // Primeira série usa a cor principal
+            } else {
+                // Gerar variações para séries adicionais
+                return this._generateColorVariation(primaryColor, index);
+            }
+        }
+        
+        // Caso contrário, usar cores padrão do ECharts
+        const defaultColors = [
+            '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de',
+            '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc', '#c23531'
+        ];
+        
+        return defaultColors[index % defaultColors.length];
+    }
+    
+    /**
+     * Get primary color defined by user
+     * @returns {string|null} Primary color string or null
+     */
+    _getPrimaryColor() {
+        // Verificar se temos a cor definida no campo value_color
+        if (this._fields_values.value_color && this._fields_values.value_color.trim() !== '') {
+            const color = this._fields_values.value_color.replace('#', '');
+            return '#' + color;
+        }
+        
+        // Verificar campo alternativo primary_color (retrocompatibilidade)
+        if (this._fields_values.primary_color && this._fields_values.primary_color.trim() !== '') {
+            return '#' + this._fields_values.primary_color.replace('#', '');
+        }
+        
+        // Retornar null para usar cores padrão quando não há cor definida
+        return null;
+    }
+    
+    /**
+     * Generate color variation based on primary color
+     * @param {string} baseColor Base color in hex format
+     * @param {number} index Index for variation
+     * @returns {string} Color variation
+     */
+    _generateColorVariation(baseColor, index) {
+        // Gerar variações da cor base
+        const variations = this._generateColorPalette(baseColor);
+        return variations[index % variations.length];
+    }
+    
+    /**
+     * Generate color palette based on base color
+     * @param {string} baseColor Base color in hex format
+     * @returns {Array} Array of color variations
+     */
+    _generateColorPalette(baseColor) {
+        // Verificar se a cor base é válida, senão usar cor padrão
+        if (!baseColor || typeof baseColor !== 'string') {
+            baseColor = '#5470c6';
+        }
+        
+        const baseRgb = this._hexToRgb(baseColor);
+        
+        // Se a conversão falhar, usar RGB padrão
+        if (!baseRgb) {
+            const variations = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'];
+            return variations;
+        }
+        
+        const variations = [baseColor];
+        
+        // Gerar 9 variações adicionais
+        for (let i = 1; i < 10; i++) {
+            const hsl = this._rgbToHsl(baseRgb.r, baseRgb.g, baseRgb.b);
+            
+            // Ajustar matiz, saturação e luminosidade
+            const newHue = (hsl.h + (i * 36)) % 360; // Rotacionar matiz
+            const newSat = Math.max(0.3, Math.min(1, hsl.s + (i % 2 === 0 ? -0.1 : 0.1)));
+            const newLight = Math.max(0.2, Math.min(0.8, hsl.l + (i % 3 === 0 ? -0.1 : 0.1)));
+            
+            const newRgb = this._hslToRgb(newHue, newSat, newLight);
+            const newHex = this._rgbToHex(newRgb.r, newRgb.g, newRgb.b);
+            variations.push(newHex);
+        }
+        
+        return variations;
+    }
+    
+    /**
+     * Convert hex to RGB
+     */
+    _hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : null;
+    }
+    
+    /**
+     * Convert RGB to HSL
+     */
+    _rgbToHsl(r, g, b) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h, s, l = (max + min) / 2;
+        
+        if (max === min) {
+            h = s = 0;
+        } else {
+            const d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                case g: h = (b - r) / d + 2; break;
+                case b: h = (r - g) / d + 4; break;
+            }
+            h /= 6;
+        }
+        
+        return { h: h * 360, s, l };
+    }
+    
+    /**
+     * Convert HSL to RGB
+     */
+    _hslToRgb(h, s, l) {
+        h /= 360;
+        const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        };
+        
+        let r, g, b;
+        if (s === 0) {
+            r = g = b = l;
+        } else {
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1/3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1/3);
+        }
+        
+        return {
+            r: Math.round(r * 255),
+            g: Math.round(g * 255),
+            b: Math.round(b * 255)
+        };
+    }
+    
+    /**
+     * Convert RGB to hex
+     */
+    _rgbToHex(r, g, b) {
+        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+    
+    /**
+     * Get all colors from the current theme
+     * @returns {Array} Array of color strings
+     */
+    _getCurrentThemeColors() {
         const themeType = parseInt(this._fields_values.color_theme || WidgetEcharts.COLOR_THEME_DEFAULT);
+        return WidgetEcharts.COLOR_THEMES[themeType] || 
+               WidgetEcharts.COLOR_THEMES[WidgetEcharts.COLOR_THEME_DEFAULT];
+    }
+    
+    /**
+     * Get a set of colors for multiple series with better distribution
+     * @param {number} count Number of colors needed
+     * @returns {Array} Array of color strings
+     */
+    _getDistributedColors(count) {
+        const result = [];
         
-        // Obter a paleta do tema selecionado ou voltar para o padrão se o tema não existir
-        const theme = WidgetEcharts.COLOR_THEMES[themeType] || 
-                      WidgetEcharts.COLOR_THEMES[WidgetEcharts.COLOR_THEME_DEFAULT];
+        // Gerar cores baseadas na cor principal ou usar padrão
+        for (let i = 0; i < count; i++) {
+            result.push(this._getColorByIndex(i));
+        }
         
-        // Retornar a cor baseada no índice (com rotação para índices maiores que o tamanho da paleta)
-        return theme[index % theme.length];
+        return result;
     }
 
     _getColorByValue(value, min, max) {
@@ -1116,207 +1335,11 @@ class WidgetEcharts extends CWidget {
         };
     }
 
+    // _createLiquidChart - Temporarily disabled
+    // LiquidFill plugin causes rendering issues, using gauge chart as fallback
     _createLiquidChart(data) {
-        if (!data.fields || !data.fields.length) {
-            console.error('Sem dados para criar gráfico Liquid');
-            return null;
-        }
-
-        // Preparar dados para o gráfico
-        const items = data.fields;
-        const waves = [];
         
-        
-        // Limitar a 3 itens para melhor visualização
-        const maxItems = Math.min(items.length, 3);
-        
-        for (let i = 0; i < maxItems; i++) {
-            const item = items[i];
-            const value = parseFloat(item.value);
-            
-            if (isNaN(value)) {
-                continue;
-            }
-            
-            // Normalizar o valor para 0-1 para uso no liquid fill
-            const normalizedValue = Math.max(0, Math.min(1, value / 100));
-            
-            // Adicionar a camada com opacidade decrescente para camadas mais profundas
-            const opacity = 0.95 - (i * 0.2);
-            
-            waves.push({
-                value: normalizedValue,
-                itemStyle: {
-                    color: this._getColorByIndex(i),
-                    opacity: opacity
-                },
-                // Adicionar dados originais para o tooltip
-                originalValue: value,
-                originalName: item.name,
-                originalUnits: item.units
-            });
-        }
-        
-        if (waves.length === 0) {
-            console.error('Nenhum item válido para exibir no gráfico Liquid');
-            return null;
-        }
-        
-        // Remover qualquer legenda personalizada anterior
-        if (this._chart_container) {
-            const existingLegend = this._chart_container.querySelector('.liquid-legend');
-            if (existingLegend) {
-                existingLegend.remove();
-            }
-        }
-        
-        // Se tivermos apenas um item, usar configuração simplificada
-        if (waves.length === 1) {
-            const item = items[0];
-            const value = parseFloat(item.value);
-            const formattedValue = this._formatValueWithUnits(value, item.units);
-            
-            return {
-                tooltip: {
-                    formatter: (params) => {
-                        const itemData = items[0];
-                        return `${itemData.name}: ${this._formatValueWithUnits(itemData.value, itemData.units)}`;
-                    }
-                },
-                series: [{
-                    type: 'liquidFill',
-                    data: waves,
-                    radius: '80%',
-                    center: ['50%', '50%'],
-                    outline: {
-                        show: true,
-                        borderDistance: 5,
-                        itemStyle: {
-                            borderColor: '#294D99',
-                            borderWidth: 2
-                        }
-                    },
-                    backgroundStyle: {
-                        color: 'rgba(0, 0, 0, 0.1)'
-                    },
-                    label: {
-                        show: true,
-                        fontSize: 30,
-                        fontWeight: 'bold',
-                        formatter: () => formattedValue,
-                        color: '#fff'
-                    },
-                    itemStyle: {
-                        shadowBlur: 30,
-                        shadowColor: 'rgba(0, 0, 0, 0.4)'
-                    }
-                }]
-            };
-        }
-        
-        // Para múltiplos itens, mostrar valor do principal no centro
-        const primaryItem = items[0];
-        const primaryValue = parseFloat(primaryItem.value);
-        const formattedValue = this._formatValueWithUnits(primaryValue, primaryItem.units);
-
-        // Adicionar uma legenda para múltiplos itens
-        if (this._chart_container && waves.length > 1) {
-            // Criar legenda personalizada
-            setTimeout(() => {
-                // Garantir que o container ainda exista
-                if (!this._chart_container) return;
-                
-                // Criar a legenda
-                const legend = document.createElement('div');
-                legend.className = 'liquid-legend';
-                legend.style.cssText = `
-                    position: absolute;
-                    bottom: 10px;
-                    left: 0;
-                    right: 0;
-                    text-align: center;
-                    font-size: 12px;
-                    color: white;
-                    z-index: 10;
-                    background-color: rgba(0,0,0,0.2);
-                    padding: 5px;
-                    border-radius: 4px;
-                    pointer-events: none;
-                `;
-                
-                // Adicionar itens à legenda
-                for (let i = 0; i < items.length && i < maxItems; i++) {
-                    const item = items[i];
-                    const formattedItemValue = this._formatValueWithUnits(item.value, item.units);
-                    const color = this._getColorByIndex(i);
-                    
-                    const legendItem = document.createElement('div');
-                    legendItem.style.cssText = `
-                        display: inline-block;
-                        margin: 0 5px;
-                        white-space: nowrap;
-                    `;
-                    
-                    legendItem.innerHTML = `
-                        <span style="display: inline-block; width: 10px; height: 10px; background-color: ${color}; margin-right: 5px;"></span>
-                        <span>${item.name}: ${formattedItemValue}</span>
-                    `;
-                    
-                    legend.appendChild(legendItem);
-                }
-                
-                this._chart_container.appendChild(legend);
-            }, 100);
-        }
-        
-        return {
-            tooltip: {
-                formatter: (params) => {
-                    // Determinar qual item do tooltip está sendo mostrado com base no índice
-                    const waveIndex = params.dataIndex;
-                    if (waveIndex >= 0 && waveIndex < items.length) {
-                        const itemData = items[waveIndex];
-                        return `${itemData.name}: ${this._formatValueWithUnits(itemData.value, itemData.units)}`;
-                    }
-                    return "Sem dados";
-                }
-            },
-            series: [{
-                type: 'liquidFill',
-                data: waves, // Múltiplos items como camadas no mesmo gráfico
-                radius: '80%',
-                center: ['50%', '50%'],
-                outline: {
-                    show: true,
-                    borderDistance: 5,
-                    itemStyle: {
-                        borderColor: '#294D99',
-                        borderWidth: 2
-                    }
-                },
-                backgroundStyle: {
-                    color: 'rgba(0, 0, 0, 0.1)'
-                },
-                label: {
-                    show: true,
-                    position: 'inside',
-                    formatter: () => formattedValue,
-                    fontSize: 28,
-                    fontWeight: 'bold',
-                    color: '#fff'
-                },
-                amplitude: 20,
-                waveLength: '80%',
-                phase: 'auto',
-                period: 'auto',
-                direction: 'right',
-                waveAnimation: true,
-                animationEasing: 'linear',
-                animationEasingUpdate: 'linear',
-                animationDuration: 2000,
-                animationDurationUpdate: 1000
-            }]
-        };
+        return this._createGaugeChart(data);
     }
 
     _createPieChart(data) {
@@ -1327,13 +1350,16 @@ class WidgetEcharts extends CWidget {
         const isDarkTheme = document.body.classList.contains('dark-theme');
         const textColor = isDarkTheme ? '#ffffff' : '#000000';
         
+        // Get distributed colors for all series
+        const distributedColors = this._getDistributedColors(fields.length);
+        
         // Preparar dados para o gráfico de pizza
         const chartData = fields.map((field, index) => ({
             value: parseFloat(field.value),
             name: field.name,
             units: field.units || '',
             itemStyle: {
-                color: this._getColorByIndex(index)
+                color: distributedColors[index]
             }
         })).filter(item => !isNaN(item.value));
         
@@ -1627,12 +1653,15 @@ class WidgetEcharts extends CWidget {
             return null;
         }
 
+        // Get distributed colors for all series
+        const distributedColors = this._getDistributedColors(items.length);
+        
         // Preparar dados para o gráfico
         const chartData = items.map((item, index) => ({
             value: Math.abs(parseFloat(item.value)),
             name: item.name,
             itemStyle: {
-                color: this._getColorByIndex(index)
+                color: distributedColors[index]
             }
         }));
 
@@ -2164,13 +2193,16 @@ class WidgetEcharts extends CWidget {
         const isDarkTheme = document.body.classList.contains('dark-theme');
         const textColor = isDarkTheme ? '#ffffff' : '#000000';
         
+        // Get distributed colors for all series
+        const distributedColors = this._getDistributedColors(fields.length);
+        
         // Preparar dados para o gráfico de funil
         const chartData = fields.map((field, index) => ({
             value: parseFloat(field.value),
             name: field.name,
             units: field.units || '',
             itemStyle: {
-                color: this._getColorByIndex(index)
+                color: distributedColors[index]
             }
         })).filter(item => !isNaN(item.value));
         
@@ -2432,6 +2464,12 @@ class WidgetEcharts extends CWidget {
         }
     }
 
+    // _isLiquidFillAvailable - Temporarily disabled
+    // LiquidFill plugin availability check removed
+    _isLiquidFillAvailable() {
+        return false; // Always return false to disable liquidFill
+    }
+
     _getResourceColor(value) {
         if (value >= 80) return '#ee6666';      // Vermelho para alto uso
         if (value >= 60) return '#fac858';      // Amarelo para médio uso
@@ -2581,5 +2619,1359 @@ class WidgetEcharts extends CWidget {
         } catch (error) {
             console.error("Erro ao atualizar o gráfico:", error);
         }
+    }
+
+    /**
+     * Calculate statistics for series data
+     * @param {Array} seriesData Array of [timestamp, value] pairs
+     * @returns {Object} Statistics object with min, max, avg, last values
+     */
+    _calculateSeriesStats(seriesData) {
+        if (!seriesData || seriesData.length === 0) {
+            return { min: 0, max: 0, avg: 0, last: 0 };
+        }
+
+        const values = seriesData.map(point => point[1]);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+        const last = values[values.length - 1];
+
+        return { min, max, avg, last };
+    }
+
+    /**
+     * Create enhanced legend with statistics in separate container
+     * @param {Array} legendData Array of legend items with statistics
+     */
+    _createEnhancedLegend(legendData) {
+        if (!legendData || legendData.length === 0) return;
+
+        const isDarkTheme = document.body.classList.contains('dark-theme');
+        const textColor = isDarkTheme ? '#ffffff' : '#000000';
+        const backgroundColor = isDarkTheme ? 'rgba(25, 25, 25, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+        const borderColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+        // Find legend container
+        const legendContainer = this._chart_container.parentElement.querySelector('.chart-legend-container');
+        if (!legendContainer) return;
+
+        // Clear existing content
+        legendContainer.innerHTML = '';
+        
+        // Check if this is a temporal chart
+        const displayType = parseInt(this._fields_values.display_type);
+        const isTemporalChart = displayType === WidgetEcharts.DISPLAY_TYPE_TEMPORAL_LINE || 
+                              displayType === WidgetEcharts.DISPLAY_TYPE_TEMPORAL_AREA ||
+                              displayType === WidgetEcharts.DISPLAY_TYPE_AREA_RAINFALL ||
+                              displayType === WidgetEcharts.DISPLAY_TYPE_SCATTER_EFFECT;
+        
+        // Set container styles specifically for temporal charts
+        if (isTemporalChart) {
+            legendContainer.style.cssText = `
+                padding: 6px 8px;
+                background: ${backgroundColor};
+                border-top: 1px solid ${borderColor};
+                min-height: 45px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-wrap: nowrap;
+                gap: 8px;
+                margin-top: 0;
+                position: relative;
+                z-index: 10;
+            `;
+        } else {
+            legendContainer.style.cssText = `
+                padding: 8px;
+                background: ${backgroundColor};
+                border-top: 1px solid ${borderColor};
+                min-height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 12px;
+            `;
+        }
+
+        // Pagination settings for temporal charts
+        const itemsPerPage = isTemporalChart ? Math.min(2, legendData.length) : Math.min(3, legendData.length);
+        const totalPages = Math.ceil(legendData.length / itemsPerPage);
+        let currentPage = 0;
+
+        // Create items container
+        const itemsContainer = document.createElement('div');
+        itemsContainer.className = 'legend-items';
+        
+        if (isTemporalChart) {
+            itemsContainer.style.cssText = `
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: nowrap;
+                justify-content: center;
+                flex: 1;
+                overflow: hidden;
+            `;
+        } else {
+            itemsContainer.style.cssText = `
+                display: flex;
+                gap: 12px;
+                align-items: center;
+                flex-wrap: wrap;
+                justify-content: center;
+                flex: 1;
+            `;
+        }
+
+        // Function to update visible items
+        const updateVisibleItems = () => {
+            itemsContainer.innerHTML = '';
+            
+            const startIndex = currentPage * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, legendData.length);
+            
+            for (let i = startIndex; i < endIndex; i++) {
+                const item = legendData[i];
+                
+                const legendItem = document.createElement('div');
+                legendItem.className = 'legend-item';
+                
+                if (isTemporalChart) {
+                    legendItem.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                        padding: 3px 6px;
+                        border-radius: 3px;
+                        transition: background-color 0.2s;
+                        cursor: pointer;
+                        border: 1px solid ${borderColor};
+                        background: ${isDarkTheme ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'};
+                        flex-shrink: 0;
+                        max-width: 200px;
+                    `;
+                } else {
+                    legendItem.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        transition: background-color 0.2s;
+                        cursor: pointer;
+                        border: 1px solid ${borderColor};
+                        background: ${isDarkTheme ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'};
+                    `;
+                }
+
+                // Add hover effect
+                legendItem.addEventListener('mouseenter', () => {
+                    legendItem.style.backgroundColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+                });
+                legendItem.addEventListener('mouseleave', () => {
+                    legendItem.style.backgroundColor = isDarkTheme ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+                });
+
+                // Color indicator
+                const colorIndicator = document.createElement('div');
+                colorIndicator.style.cssText = `
+                    width: ${isTemporalChart ? '10px' : '12px'};
+                    height: ${isTemporalChart ? '10px' : '12px'};
+                    border-radius: ${isTemporalChart ? '1px' : '2px'};
+                    background-color: ${item.color};
+                    flex-shrink: 0;
+                `;
+
+                // Item info container
+                const itemInfo = document.createElement('div');
+                itemInfo.style.cssText = `
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1px;
+                    flex: 1;
+                    min-width: 0;
+                `;
+
+                // Item name
+                const itemName = document.createElement('div');
+                itemName.style.cssText = `
+                    font-weight: 500;
+                    color: ${textColor};
+                    font-size: ${isTemporalChart ? '9px' : '11px'};
+                    line-height: 1.2;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                `;
+                itemName.textContent = isTemporalChart ? 
+                    (item.name.length > 20 ? item.name.substring(0, 20) + '...' : item.name) :
+                    (item.name.length > 25 ? item.name.substring(0, 25) + '...' : item.name);
+
+                // Statistics
+                const stats = document.createElement('div');
+                if (isTemporalChart) {
+                    stats.style.cssText = `
+                        display: flex;
+                        gap: 4px;
+                        font-size: 8px;
+                        color: ${isDarkTheme ? '#ccc' : '#666'};
+                        line-height: 1.1;
+                        white-space: nowrap;
+                        overflow: hidden;
+                    `;
+                    stats.innerHTML = `
+                        <span>L: ${item.stats.last}</span>
+                        <span>Min: ${item.stats.min}</span>
+                        <span>Max: ${item.stats.max}</span>
+                        <span>Avg: ${item.stats.avg}</span>
+                    `;
+                } else {
+                    stats.style.cssText = `
+                        display: flex;
+                        gap: 6px;
+                        font-size: 10px;
+                        color: ${isDarkTheme ? '#ccc' : '#666'};
+                        line-height: 1.1;
+                    `;
+                    stats.innerHTML = `
+                        <span>Last: ${item.stats.last}</span>
+                        <span>Min: ${item.stats.min}</span>
+                        <span>Max: ${item.stats.max}</span>
+                        <span>Avg: ${item.stats.avg}</span>
+                    `;
+                }
+
+                itemInfo.appendChild(itemName);
+                itemInfo.appendChild(stats);
+
+                legendItem.appendChild(colorIndicator);
+                legendItem.appendChild(itemInfo);
+
+                itemsContainer.appendChild(legendItem);
+            }
+        };
+
+        // Create navigation container if needed
+        if (totalPages > 1) {
+            const navContainer = document.createElement('div');
+            navContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: ${isTemporalChart ? '4px' : '8px'};
+                flex-shrink: 0;
+            `;
+
+            const leftArrow = document.createElement('button');
+            leftArrow.innerHTML = '◀';
+            leftArrow.style.cssText = `
+                background: ${backgroundColor};
+                border: 1px solid ${borderColor};
+                color: ${textColor};
+                width: ${isTemporalChart ? '20px' : '28px'};
+                height: ${isTemporalChart ? '20px' : '28px'};
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: ${isTemporalChart ? '10px' : '12px'};
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: opacity 0.2s;
+                flex-shrink: 0;
+            `;
+
+            const rightArrow = document.createElement('button');
+            rightArrow.innerHTML = '▶';
+            rightArrow.style.cssText = leftArrow.style.cssText;
+
+            const pageInfo = document.createElement('span');
+            pageInfo.style.cssText = `
+                font-size: ${isTemporalChart ? '8px' : '10px'};
+                color: ${textColor};
+                opacity: 0.7;
+                flex-shrink: 0;
+            `;
+
+            // Add navigation functionality
+            leftArrow.addEventListener('click', () => {
+                if (currentPage > 0) {
+                    currentPage--;
+                    updateVisibleItems();
+                    updateNavigation();
+                }
+            });
+
+            rightArrow.addEventListener('click', () => {
+                if (currentPage < totalPages - 1) {
+                    currentPage++;
+                    updateVisibleItems();
+                    updateNavigation();
+                }
+            });
+
+            const updateNavigation = () => {
+                leftArrow.style.opacity = currentPage === 0 ? '0.3' : '1';
+                rightArrow.style.opacity = currentPage === totalPages - 1 ? '0.3' : '1';
+                pageInfo.textContent = `${currentPage + 1}/${totalPages}`;
+            };
+
+            navContainer.appendChild(leftArrow);
+            navContainer.appendChild(pageInfo);
+            navContainer.appendChild(rightArrow);
+
+            legendContainer.appendChild(navContainer);
+            legendContainer.appendChild(itemsContainer);
+
+            updateNavigation();
+        } else {
+            legendContainer.appendChild(itemsContainer);
+        }
+
+        // Initialize with first page
+        updateVisibleItems();
+    }
+
+    /**
+     * Create temporal line chart
+     * @param {Object} data Chart data
+     * @returns {Object} ECharts options
+     */
+    _createTemporalLineChart(data) {
+        if (!this._items_history || Object.keys(this._items_history).length === 0) {
+            return {
+                graphic: {
+                    type: 'text',
+                    left: 'center',
+                    top: 'middle',
+                    style: {
+                        text: 'No historical data available',
+                        fontSize: 14,
+                        fill: '#999'
+                    }
+                }
+            };
+        }
+
+        const series = [];
+        const legend_data = [];
+        const enhanced_legend_data = [];
+        const showLegend = this._fields_values.show_legend === true || this._fields_values.show_legend === 1;
+        const showGrid = this._fields_values.show_grid === true || this._fields_values.show_grid === 1;
+        const smoothLines = this._fields_values.smooth_lines === true || this._fields_values.smooth_lines === 1;
+
+        // Get distributed colors for all series
+        const itemIds = Object.keys(this._items_history);
+        const distributedColors = this._getDistributedColors(itemIds.length);
+
+        // Process each item's historical data
+        itemIds.forEach((itemid, index) => {
+            const history = this._items_history[itemid];
+            const meta = this._items_meta[itemid];
+            
+            if (!history || !history.length || !meta) return;
+
+            const seriesData = history.map(point => [
+                point.clock * 1000, // Convert to milliseconds for JavaScript Date
+                parseFloat(point.value) || 0
+            ]);
+
+            // Calculate statistics
+            const stats = this._calculateSeriesStats(seriesData);
+            const units = meta.units || '';
+
+            // Clean item name for better display
+            let item_name = meta.name || `Item ${itemid}`;
+            item_name = item_name.replace(/^Container\s*\/\s*/, ''); // Remove "Container /" prefix
+            
+            legend_data.push(item_name);
+
+            // Prepare enhanced legend data
+            enhanced_legend_data.push({
+                name: item_name,
+                color: distributedColors[index],
+                stats: {
+                    last: this._formatValueWithUnits(stats.last, units),
+                    min: this._formatValueWithUnits(stats.min, units),
+                    max: this._formatValueWithUnits(stats.max, units),
+                    avg: this._formatValueWithUnits(stats.avg, units)
+                }
+            });
+
+            series.push({
+                name: item_name,
+                type: 'line',
+                data: seriesData,
+                smooth: smoothLines,
+                symbol: 'none', // Remove dots for cleaner look
+                symbolSize: 3,
+                lineStyle: {
+                    width: 2,
+                    color: distributedColors[index]
+                },
+                itemStyle: {
+                    color: distributedColors[index]
+                },
+                emphasis: {
+                    focus: 'series',
+                    lineStyle: {
+                        width: 3
+                    }
+                },
+                animationDelay: index * 100
+            });
+        });
+
+        const isDarkTheme = document.body.classList.contains('dark-theme');
+        const textColor = isDarkTheme ? '#ffffff' : '#000000';
+        const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+        const options = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'cross',
+                    animation: false,
+                    label: {
+                        backgroundColor: 'rgba(50, 50, 50, 0.8)',
+                        color: '#fff',
+                        fontSize: 12
+                    },
+                    crossStyle: {
+                        color: '#999',
+                        width: 1,
+                        type: 'dashed'
+                    }
+                },
+                backgroundColor: 'rgba(50, 50, 50, 0.9)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                borderWidth: 1,
+                textStyle: {
+                    color: '#fff',
+                    fontSize: 12
+                },
+                formatter: (params) => {
+                    if (!params || !params.length) return '';
+                    
+                    const date = new Date(params[0].value[0]);
+                    const time = date.toLocaleString([], {
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric',
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                    let tooltip = `<div style="font-weight: bold; margin-bottom: 8px; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">${time}</div>`;
+                    
+                    params.forEach(param => {
+                        const itemIds = Object.keys(this._items_history);
+                        const itemId = itemIds[param.seriesIndex];
+                        const meta = this._items_meta[itemId];
+                        const units = meta ? meta.units || '' : '';
+                        
+                        // Format value with proper units and scientific notation handling
+                        let value = param.value[1];
+                        let formattedValue;
+                        
+                        if (units && units.toLowerCase().includes('bps')) {
+                            formattedValue = this._formatBitsValue(value);
+                        } else if (units && units.toLowerCase() === '%') {
+                            formattedValue = value.toFixed(2) + '%';
+                        } else {
+                            formattedValue = this._formatValueWithUnits(value, units);
+                        }
+                        
+                        tooltip += `<div style="color: #fff; margin: 2px 0;">
+                            <span style="display:inline-block;margin-right:8px;border-radius:50%;width:8px;height:8px;background-color:${param.color};"></span>
+                            <span style="font-weight: 500;">${param.seriesName}:</span> <span style="float: right; margin-left: 10px;">${formattedValue}</span>
+                        </div>`;
+                    });
+                    
+                    return tooltip;
+                }
+            },
+            legend: {
+                show: false // Disable default legend as we'll use custom one
+            },
+            grid: {
+                left: '3%',
+                right: '3%',
+                bottom: showLegend ? '10%' : '8%', // Space for enhanced legend
+                top: '5%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'time',
+                boundaryGap: false,
+                axisLine: {
+                    show: true,
+                    lineStyle: {
+                        color: textColor,
+                        width: 1
+                    }
+                },
+                axisTick: {
+                    show: false
+                },
+                axisLabel: {
+                    color: textColor,
+                    fontSize: 11,
+                    formatter: (value) => {
+                        const date = new Date(value);
+                        const now = new Date();
+                        const isToday = date.toDateString() === now.toDateString();
+                        
+                        if (isToday) {
+                            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        } else {
+                            return date.toLocaleDateString([], {month: 'short', day: 'numeric'}) + '\n' + 
+                                   date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        }
+                    }
+                },
+                splitLine: {
+                    show: showGrid,
+                    lineStyle: {
+                        color: gridColor,
+                        type: 'dashed'
+                    }
+                }
+            },
+            yAxis: {
+                type: 'value',
+                axisLine: {
+                    show: false
+                },
+                axisTick: {
+                    show: false
+                },
+                axisLabel: {
+                    color: textColor,
+                    fontSize: 11,
+                    formatter: (value) => {
+                        // Auto-format based on value size
+                        if (Math.abs(value) >= 1000000000) {
+                            return (value / 1000000000).toFixed(1) + 'G';
+                        } else if (Math.abs(value) >= 1000000) {
+                            return (value / 1000000).toFixed(1) + 'M';
+                        } else if (Math.abs(value) >= 1000) {
+                            return (value / 1000).toFixed(1) + 'K';
+                        } else {
+                            return value.toFixed(0);
+                        }
+                    }
+                },
+                splitLine: {
+                    show: showGrid,
+                    lineStyle: {
+                        color: gridColor,
+                        type: 'dashed'
+                    }
+                }
+            },
+            series: series,
+            animation: true,
+            animationDuration: 750,
+            animationEasing: 'cubicOut',
+            dataZoom: [
+                {
+                    type: 'inside',
+                    start: 0,
+                    end: 100
+                }
+            ]
+        };
+
+        // Add enhanced legend after chart is rendered
+        if (showLegend && enhanced_legend_data.length > 0) {
+            // Add temporal legend class for styling
+            const container = this._chart_container.parentElement;
+            if (container) {
+                container.classList.add('temporal-legend-active');
+            }
+            
+            setTimeout(() => {
+                this._createEnhancedLegend(enhanced_legend_data);
+            }, 100);
+        }
+
+        return options;
+    }
+
+    /**
+     * Create temporal area chart
+     * @param {Object} data Chart data
+     * @returns {Object} ECharts options
+     */
+    _createTemporalAreaChart(data) {
+        if (!this._items_history || Object.keys(this._items_history).length === 0) {
+            return {
+                graphic: {
+                    type: 'text',
+                    left: 'center',
+                    top: 'middle',
+                    style: {
+                        text: 'No historical data available',
+                        fontSize: 14,
+                        fill: '#999'
+                    }
+                }
+            };
+        }
+
+        const series = [];
+        const legend_data = [];
+        const enhanced_legend_data = [];
+        const showLegend = this._fields_values.show_legend === true || this._fields_values.show_legend === 1;
+        const showGrid = this._fields_values.show_grid === true || this._fields_values.show_grid === 1;
+        const smoothLines = this._fields_values.smooth_lines === true || this._fields_values.smooth_lines === 1;
+
+        // Get distributed colors for all series
+        const itemIds = Object.keys(this._items_history);
+        const distributedColors = this._getDistributedColors(itemIds.length);
+
+        // Process each item's historical data
+        itemIds.forEach((itemid, index) => {
+            const history = this._items_history[itemid];
+            const meta = this._items_meta[itemid];
+            
+            if (!history || !history.length || !meta) return;
+
+            const seriesData = history.map(point => [
+                point.clock * 1000, // Convert to milliseconds for JavaScript Date
+                parseFloat(point.value) || 0
+            ]);
+
+            // Calculate statistics
+            const stats = this._calculateSeriesStats(seriesData);
+            const units = meta.units || '';
+
+            // Clean item name for better display
+            let item_name = meta.name || `Item ${itemid}`;
+            item_name = item_name.replace(/^Container\s*\/\s*/, ''); // Remove "Container /" prefix
+            
+            legend_data.push(item_name);
+
+            // Prepare enhanced legend data
+            enhanced_legend_data.push({
+                name: item_name,
+                color: distributedColors[index],
+                stats: {
+                    last: this._formatValueWithUnits(stats.last, units),
+                    min: this._formatValueWithUnits(stats.min, units),
+                    max: this._formatValueWithUnits(stats.max, units),
+                    avg: this._formatValueWithUnits(stats.avg, units)
+                }
+            });
+
+            const color = distributedColors[index];
+
+            series.push({
+                name: item_name,
+                type: 'line',
+                data: seriesData,
+                smooth: smoothLines,
+                symbol: 'circle',
+                symbolSize: 0, // Hide symbols by default
+                lineStyle: {
+                    width: 2,
+                    color: color
+                },
+                itemStyle: {
+                    color: color
+                },
+                areaStyle: {
+                    color: {
+                        type: 'linear',
+                        x: 0,
+                        y: 0,
+                        x2: 0,
+                        y2: 1,
+                        colorStops: [
+                            {
+                                offset: 0,
+                                color: color + '80' // 50% opacity at top
+                            },
+                            {
+                                offset: 1,
+                                color: color + '10' // 6% opacity at bottom
+                            }
+                        ]
+                    }
+                },
+                emphasis: {
+                    focus: 'series',
+                    lineStyle: {
+                        width: 3
+                    },
+                    symbolSize: 4
+                },
+                animationDelay: index * 100
+            });
+        });
+
+        const isDarkTheme = document.body.classList.contains('dark-theme');
+        const textColor = isDarkTheme ? '#ffffff' : '#000000';
+        const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+        const options = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'cross',
+                    animation: false,
+                    label: {
+                        backgroundColor: 'rgba(50, 50, 50, 0.8)',
+                        color: '#fff',
+                        fontSize: 12
+                    },
+                    crossStyle: {
+                        color: '#999',
+                        width: 1,
+                        type: 'dashed'
+                    }
+                },
+                backgroundColor: 'rgba(50, 50, 50, 0.9)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                borderWidth: 1,
+                textStyle: {
+                    color: '#fff',
+                    fontSize: 12
+                },
+                formatter: (params) => {
+                    if (!params || !params.length) return '';
+                    
+                    const date = new Date(params[0].value[0]);
+                    const time = date.toLocaleString([], {
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric',
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                    let tooltip = `<div style="font-weight: bold; margin-bottom: 8px; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">${time}</div>`;
+                    
+                    params.forEach(param => {
+                        const itemIds = Object.keys(this._items_history);
+                        const itemId = itemIds[param.seriesIndex];
+                        const meta = this._items_meta[itemId];
+                        const units = meta ? meta.units || '' : '';
+                        
+                        // Format value with proper units and scientific notation handling
+                        let value = param.value[1];
+                        let formattedValue;
+                        
+                        if (units && units.toLowerCase().includes('bps')) {
+                            formattedValue = this._formatBitsValue(value);
+                        } else if (units && units.toLowerCase() === '%') {
+                            formattedValue = value.toFixed(2) + '%';
+                        } else {
+                            formattedValue = this._formatValueWithUnits(value, units);
+                        }
+                        
+                        tooltip += `<div style="color: #fff; margin: 2px 0;">
+                            <span style="display:inline-block;margin-right:8px;border-radius:50%;width:8px;height:8px;background-color:${param.color};"></span>
+                            <span style="font-weight: 500;">${param.seriesName}:</span> <span style="float: right; margin-left: 10px;">${formattedValue}</span>
+                        </div>`;
+                    });
+                    
+                    return tooltip;
+                }
+            },
+            legend: {
+                show: false // Disable default legend as we'll use custom one
+            },
+            grid: {
+                left: '3%',
+                right: '3%',
+                bottom: showLegend ? '10%' : '8%', // Space for enhanced legend
+                top: '5%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'time',
+                boundaryGap: false,
+                axisLine: {
+                    show: true,
+                    lineStyle: {
+                        color: textColor,
+                        width: 1
+                    }
+                },
+                axisTick: {
+                    show: false
+                },
+                axisLabel: {
+                    color: textColor,
+                    fontSize: 11,
+                    formatter: (value) => {
+                        const date = new Date(value);
+                        const now = new Date();
+                        const isToday = date.toDateString() === now.toDateString();
+                        
+                        if (isToday) {
+                            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        } else {
+                            return date.toLocaleDateString([], {month: 'short', day: 'numeric'}) + '\n' + 
+                                   date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        }
+                    }
+                },
+                splitLine: {
+                    show: showGrid,
+                    lineStyle: {
+                        color: gridColor,
+                        type: 'dashed'
+                    }
+                }
+            },
+            yAxis: {
+                type: 'value',
+                axisLine: {
+                    show: false
+                },
+                axisTick: {
+                    show: false
+                },
+                axisLabel: {
+                    color: textColor,
+                    fontSize: 11,
+                    formatter: (value) => {
+                        // Auto-format based on value size
+                        if (Math.abs(value) >= 1000000000) {
+                            return (value / 1000000000).toFixed(1) + 'G';
+                        } else if (Math.abs(value) >= 1000000) {
+                            return (value / 1000000).toFixed(1) + 'M';
+                        } else if (Math.abs(value) >= 1000) {
+                            return (value / 1000).toFixed(1) + 'K';
+                        } else {
+                            return value.toFixed(0);
+                        }
+                    }
+                },
+                splitLine: {
+                    show: showGrid,
+                    lineStyle: {
+                        color: gridColor,
+                        type: 'dashed'
+                    }
+                }
+            },
+            series: series,
+            animation: true,
+            animationDuration: 750,
+            animationEasing: 'cubicOut',
+            dataZoom: [
+                {
+                    type: 'inside',
+                    start: 0,
+                    end: 100
+                }
+            ]
+        };
+
+        // Add enhanced legend after chart is rendered
+        if (showLegend && enhanced_legend_data.length > 0) {
+            // Add temporal legend class for styling
+            const container = this._chart_container.parentElement;
+            if (container) {
+                container.classList.add('temporal-legend-active');
+            }
+            
+            setTimeout(() => {
+                this._createEnhancedLegend(enhanced_legend_data);
+            }, 100);
+        }
+
+        return options;
+    }
+
+    /**
+     * Create area rainfall chart
+     * @param {Object} data Chart data
+     * @returns {Object} ECharts options
+     */
+    _createAreaRainfallChart(data) {
+        if (!this._items_history || Object.keys(this._items_history).length === 0) {
+            return {
+                graphic: {
+                    type: 'text',
+                    left: 'center',
+                    top: 'middle',
+                    style: {
+                        text: 'No historical data available',
+                        fontSize: 14,
+                        fill: '#999'
+                    }
+                }
+            };
+        }
+
+        const series = [];
+        const enhanced_legend_data = [];
+        const showLegend = this._fields_values.show_legend === true || this._fields_values.show_legend === 1;
+        const showGrid = this._fields_values.show_grid === true || this._fields_values.show_grid === 1;
+
+        // Get distributed colors for all series
+        const itemIds = Object.keys(this._items_history);
+        const distributedColors = this._getDistributedColors(itemIds.length);
+
+        // Process each item's historical data
+        itemIds.forEach((itemid, index) => {
+            const history = this._items_history[itemid];
+            const meta = this._items_meta[itemid];
+            
+            if (!history || !history.length || !meta) return;
+
+            const seriesData = history.map(point => [
+                point.clock * 1000, // Convert to milliseconds for JavaScript Date
+                parseFloat(point.value) || 0
+            ]);
+
+            // Calculate statistics
+            const stats = this._calculateSeriesStats(seriesData);
+            const units = meta.units || '';
+
+            // Clean item name for better display
+            let item_name = meta.name || `Item ${itemid}`;
+            item_name = item_name.replace(/^Container\s*\/\s*/, ''); // Remove "Container /" prefix
+
+            // Prepare enhanced legend data
+            enhanced_legend_data.push({
+                name: item_name,
+                color: distributedColors[index],
+                stats: {
+                    last: this._formatValueWithUnits(stats.last, units),
+                    min: this._formatValueWithUnits(stats.min, units),
+                    max: this._formatValueWithUnits(stats.max, units),
+                    avg: this._formatValueWithUnits(stats.avg, units)
+                }
+            });
+
+            const color = distributedColors[index];
+
+            series.push({
+                name: item_name,
+                type: 'line',
+                data: seriesData,
+                stack: 'total',
+                smooth: true,
+                lineStyle: {
+                    width: 0
+                },
+                showSymbol: false,
+                areaStyle: {
+                    opacity: 0.8,
+                    color: {
+                        type: 'linear',
+                        x: 0,
+                        y: 0,
+                        x2: 0,
+                        y2: 1,
+                        colorStops: [
+                            {
+                                offset: 0,
+                                color: color + 'FF'
+                            },
+                            {
+                                offset: 1,
+                                color: color + '80'
+                            }
+                        ]
+                    }
+                },
+                emphasis: {
+                    focus: 'series'
+                },
+                animationDelay: index * 100
+            });
+        });
+
+        const isDarkTheme = document.body.classList.contains('dark-theme');
+        const textColor = isDarkTheme ? '#ffffff' : '#000000';
+        const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+        const options = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'cross',
+                    animation: false,
+                    label: {
+                        backgroundColor: 'rgba(50, 50, 50, 0.8)',
+                        color: '#fff',
+                        fontSize: 12
+                    },
+                    crossStyle: {
+                        color: '#999',
+                        width: 1,
+                        type: 'dashed'
+                    }
+                },
+                backgroundColor: 'rgba(50, 50, 50, 0.9)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                borderWidth: 1,
+                textStyle: {
+                    color: '#fff',
+                    fontSize: 12
+                },
+                formatter: (params) => {
+                    if (!params || !params.length) return '';
+                    
+                    const date = new Date(params[0].value[0]);
+                    const time = date.toLocaleString([], {
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric',
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                    let tooltip = `<div style="font-weight: bold; margin-bottom: 8px; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">${time}</div>`;
+                    
+                    params.forEach(param => {
+                        const itemIds = Object.keys(this._items_history);
+                        const itemId = itemIds[param.seriesIndex];
+                        const meta = this._items_meta[itemId];
+                        const units = meta ? meta.units || '' : '';
+                        
+                        // Format value with proper units and scientific notation handling
+                        let value = param.value[1];
+                        let formattedValue;
+                        
+                        if (units && units.toLowerCase().includes('bps')) {
+                            formattedValue = this._formatBitsValue(value);
+                        } else if (units && units.toLowerCase() === '%') {
+                            formattedValue = value.toFixed(2) + '%';
+                        } else {
+                            formattedValue = this._formatValueWithUnits(value, units);
+                        }
+                        
+                        tooltip += `<div style="color: #fff; margin: 2px 0;">
+                            <span style="display:inline-block;margin-right:8px;border-radius:50%;width:8px;height:8px;background-color:${param.color};"></span>
+                            <span style="font-weight: 500;">${param.seriesName}:</span> <span style="float: right; margin-left: 10px;">${formattedValue}</span>
+                        </div>`;
+                    });
+                    
+                    return tooltip;
+                }
+            },
+            legend: {
+                show: false
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: showLegend ? '10%' : '8%',
+                top: '5%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'time',
+                boundaryGap: false,
+                axisLine: {
+                    show: true,
+                    lineStyle: {
+                        color: textColor,
+                        width: 1
+                    }
+                },
+                axisTick: {
+                    show: false
+                },
+                axisLabel: {
+                    color: textColor,
+                    fontSize: 11,
+                    formatter: (value) => {
+                        const date = new Date(value);
+                        const now = new Date();
+                        const isToday = date.toDateString() === now.toDateString();
+                        
+                        if (isToday) {
+                            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        } else {
+                            return date.toLocaleDateString([], {month: 'short', day: 'numeric'}) + '\n' + 
+                                   date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        }
+                    }
+                },
+                splitLine: {
+                    show: showGrid,
+                    lineStyle: {
+                        color: gridColor,
+                        type: 'dashed'
+                    }
+                }
+            },
+            yAxis: {
+                type: 'value',
+                axisLine: {
+                    show: false
+                },
+                axisTick: {
+                    show: false
+                },
+                axisLabel: {
+                    color: textColor,
+                    fontSize: 11,
+                    formatter: (value) => {
+                        // Auto-format based on value size
+                        if (Math.abs(value) >= 1000000000) {
+                            return (value / 1000000000).toFixed(1) + 'G';
+                        } else if (Math.abs(value) >= 1000000) {
+                            return (value / 1000000).toFixed(1) + 'M';
+                        } else if (Math.abs(value) >= 1000) {
+                            return (value / 1000).toFixed(1) + 'K';
+                        } else {
+                            return value.toFixed(0);
+                        }
+                    }
+                },
+                splitLine: {
+                    show: showGrid,
+                    lineStyle: {
+                        color: gridColor,
+                        type: 'dashed'
+                    }
+                }
+            },
+            series: series,
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'cubicInOut'
+        };
+
+        // Add enhanced legend after chart is rendered
+        if (showLegend && enhanced_legend_data.length > 0) {
+            setTimeout(() => {
+                this._createEnhancedLegend(enhanced_legend_data);
+            }, 100);
+        }
+
+        return options;
+    }
+
+    /**
+     * Create scatter effect chart
+     * @param {Object} data Chart data
+     * @returns {Object} ECharts options
+     */
+    _createScatterEffectChart(data) {
+        const fields = data.fields;
+        if (!fields || !fields.length) return null;
+
+        const enhanced_legend_data = [];
+        const showLegend = this._fields_values.show_legend === true || this._fields_values.show_legend === 1;
+        const showGrid = this._fields_values.show_grid === true || this._fields_values.show_grid === 1;
+
+        // Get distributed colors for all series
+        const distributedColors = this._getDistributedColors(fields.length);
+
+        // Calculate min and max values to determine which points should have effects
+        const values = fields.map(field => parseFloat(field.value));
+        const minValue = Math.min(...values);
+        const maxValue = Math.max(...values);
+
+        // Prepare scatter data
+        const scatterData = fields.map((field, index) => {
+            const value = parseFloat(field.value);
+            const time = Date.now() + (index * 1000); // Spread over time for demo
+            
+            // Prepare enhanced legend data
+            enhanced_legend_data.push({
+                name: field.name,
+                color: distributedColors[index],
+                stats: {
+                    last: this._formatValueWithUnits(value, field.units),
+                    min: this._formatValueWithUnits(value * 0.8, field.units),
+                    max: this._formatValueWithUnits(value * 1.2, field.units),
+                    avg: this._formatValueWithUnits(value, field.units)
+                }
+            });
+
+            return {
+                name: field.name,
+                host: field.host,
+                value: [time, value, value * Math.random()], // [x, y, size]
+                symbolSize: Math.max(15, Math.min(50, value / 10)),
+                itemStyle: {
+                    color: distributedColors[index],
+                    shadowBlur: value === minValue || value === maxValue ? 15 : 5,
+                    shadowColor: distributedColors[index]
+                }
+            };
+        });
+
+        // Separate data into effect and normal scatter points
+        const effectScatterData = scatterData.filter(item => {
+            const value = item.value[1];
+            return value === minValue || value === maxValue;
+        });
+
+        const normalScatterData = scatterData.filter(item => {
+            const value = item.value[1];
+            return value !== minValue && value !== maxValue;
+        });
+
+        const isDarkTheme = document.body.classList.contains('dark-theme');
+        const textColor = isDarkTheme ? '#ffffff' : '#000000';
+        const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+        const series = [];
+
+        // Add normal scatter points (without effect)
+        if (normalScatterData.length > 0) {
+            series.push({
+                name: 'Normal Metrics',
+                data: normalScatterData,
+                type: 'scatter',
+                symbolSize: function (data) {
+                    return data[2] ? Math.max(15, Math.min(50, data[2])) : 20;
+                },
+                emphasis: {
+                    scale: 1.3
+                },
+                animationDelay: function (idx) {
+                    return idx * 50;
+                }
+            });
+        }
+
+        // Add effect scatter points (only min and max values)
+        if (effectScatterData.length > 0) {
+            series.push({
+                name: 'Min/Max Metrics',
+                data: effectScatterData,
+                type: 'effectScatter',
+                symbolSize: function (data) {
+                    return data[2] ? Math.max(20, Math.min(60, data[2])) : 25;
+                },
+                showEffectOn: 'render',
+                rippleEffect: {
+                    brushType: 'stroke',
+                    scale: 2.5,
+                    period: 3
+                },
+                emphasis: {
+                    scale: 1.5
+                },
+                animationDelay: function (idx) {
+                    return idx * 100 + 500;
+                }
+            });
+        }
+
+        const options = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'item',
+                backgroundColor: 'rgba(50, 50, 50, 0.9)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                borderWidth: 1,
+                textStyle: {
+                    color: '#fff',
+                    fontSize: 12
+                },
+                formatter: (params) => {
+                    const field = fields.find(f => f.name === params.data.name);
+                    if (field) {
+                        const value = params.data.value[1];
+                        const isMinMax = value === minValue || value === maxValue;
+                        const badge = value === minValue ? '<span style="color: #ff6b6b; font-weight: bold;">[MIN]</span>' : 
+                                     value === maxValue ? '<span style="color: #51cf66; font-weight: bold;">[MAX]</span>' : '';
+                        
+                        return `<div style="font-weight: bold; margin-bottom: 4px;">${params.data.name} ${badge}</div>` +
+                               `<div style="margin-bottom: 2px;"><strong>Host:</strong> ${params.data.host || 'Unknown'}</div>` +
+                               `<div><strong>Value:</strong> ${this._formatValueWithUnits(value, field.units)}</div>`;
+                    }
+                    return `<div style="font-weight: bold;">${params.data.name}</div>` +
+                           `<div><strong>Host:</strong> ${params.data.host || 'Unknown'}</div>` +
+                           `<div><strong>Value:</strong> ${params.data.value[1]}</div>`;
+                }
+            },
+            legend: {
+                show: false
+            },
+            grid: {
+                left: '3%',
+                right: '7%',
+                bottom: showLegend ? '10%' : '8%',
+                top: '5%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'time',
+                axisLine: {
+                    lineStyle: {
+                        color: textColor
+                    }
+                },
+                axisLabel: {
+                    color: textColor,
+                    fontSize: 11,
+                    formatter: (value) => {
+                        const date = new Date(value);
+                        return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+                },
+                splitLine: {
+                    show: showGrid,
+                    lineStyle: {
+                        color: gridColor,
+                        type: 'dashed'
+                    }
+                }
+            },
+            yAxis: {
+                type: 'value',
+                axisLine: {
+                    lineStyle: {
+                        color: textColor
+                    }
+                },
+                axisLabel: {
+                    color: textColor,
+                    fontSize: 11,
+                    formatter: (value) => {
+                        // Auto-format based on value size
+                        if (Math.abs(value) >= 1000000000) {
+                            return (value / 1000000000).toFixed(1) + 'G';
+                        } else if (Math.abs(value) >= 1000000) {
+                            return (value / 1000000).toFixed(1) + 'M';
+                        } else if (Math.abs(value) >= 1000) {
+                            return (value / 1000).toFixed(1) + 'K';
+                        } else {
+                            return value.toFixed(0);
+                        }
+                    }
+                },
+                splitLine: {
+                    show: showGrid,
+                    lineStyle: {
+                        color: gridColor,
+                        type: 'dashed'
+                    }
+                }
+            },
+            series: series,
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'elasticOut'
+        };
+
+        // Add enhanced legend after chart is rendered
+        if (showLegend && enhanced_legend_data.length > 0) {
+            setTimeout(() => {
+                this._createEnhancedLegend(enhanced_legend_data);
+            }, 100);
+        }
+
+        return options;
     }
 }

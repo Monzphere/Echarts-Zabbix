@@ -18,7 +18,10 @@ This module adds a customizable widget to Zabbix that allows creating interactiv
   - Funnel Chart
   - Treemap/Sunburst Chart
   - LLD Table
+  - **Temporal Line Chart** (NEW)
+  - **Temporal Area Chart** (NEW)
 
+- **6 built-in color themes** for different environments and use cases
 - Simplified configuration through Zabbix interface
 - Automatic item unit detection
 - Real-time updates
@@ -27,11 +30,29 @@ This module adds a customizable widget to Zabbix that allows creating interactiv
 - Interactive zoom and navigation
 - Automatic value formatting based on item units
 
+## 🎨 Color Themes
+
+The module includes **6 carefully designed color themes** that ensure optimal visibility and accessibility:
+
+### Available Themes:
+1. **Default** - ECharts standard colors with excellent contrast
+2. **Zabbix** - Native Zabbix trigger severity colors (Information, Warning, Average, High, Disaster)
+3. **Pastel** - Soft, pastel colors for a subtle appearance
+4. **Bright** - Vibrant, high-contrast colors for better visibility
+5. **Dark** - Deep, saturated colors perfect for dark themes
+6. **Blue Monochrome** - Various shades of blue for a professional look
+
+### Intelligent Color Distribution
+- **Smart Allocation**: Colors are distributed evenly across data series
+- **Automatic Cycling**: When you have more series than colors, the system intelligently cycles through the palette
+- **Consistent Mapping**: Each data series maintains its color throughout the visualization
+- **Accessibility Compliant**: All themes follow accessibility guidelines for color contrast
+
 ## 📊 Chart Types
 
 ### Gauge
 - Displays value in a circular gauge format
-- Dynamic colors based on value
+- Dynamic colors based on value with theme-aware palettes
 - Support for multiple color ranges
 - Smooth value update animation
 
@@ -43,9 +64,9 @@ This module adds a customizable widget to Zabbix that allows creating interactiv
 
 ### Pie Chart
 - Pie/donut visualization
-- Support for multiple values
-- Informative labels
-- Hover interaction
+- Support for multiple values with intelligent color distribution
+- Informative labels with theme-consistent styling
+- Hover interaction with enhanced color emphasis
 
 ### Horizontal Bar Chart
 - Horizontal bar visualization
@@ -89,15 +110,43 @@ This module adds a customizable widget to Zabbix that allows creating interactiv
 - Column sorting
 - Automatic value formatting
 
+### Temporal Line Chart ⭐ NEW
+- **Modern, clean visualization** with optimized layout and reduced visual clutter
+- Historical data visualization over time with **interactive zoom and pan**
+- Multiple items displayed as different colored lines with smooth animations
+- **Native Zabbix time period integration** - fully compatible with dashboard time filters
+- **Smart tooltips** with enhanced formatting and cross-axis indicators
+- **Auto-scaling Y-axis labels** (K, M, G formatting for large numbers)
+- **Intelligent time formatting** - shows time for today, date+time for other days
+- Configurable smooth lines, legend, and grid display
+- Real-time data updates with staggered animations
+- Time period indicator in widget header
+- **Responsive design** that adapts to widget size
+
+### Temporal Area Chart ⭐ NEW
+- **Beautiful gradient fill areas** with transparency effects
+- All temporal line chart features included
+- **Overlapping area visualization** instead of stacking for better readability
+- Perfect for visualizing data trends and accumulations
+- **Native Zabbix time period integration**
+- Enhanced visual appeal with modern gradients
+
 ## 🔧 Configuration
 
-1. Select desired chart type
-2. Choose items to monitor
-3. The widget automatically:
+1. **Chart Type**: Select desired chart type
+2. **Color Theme**: Choose from 6 professional color themes
+3. **Items**: Choose items to monitor
+4. For temporal charts, configure:
+   - **Time period** - uses native Zabbix time period selector with dashboard time filter integration
+   - Show/hide legend
+   - Show/hide grid
+   - Enable/disable smooth lines
+5. The widget automatically:
    - Detects item units
    - Formats values appropriately
    - Adjusts colors and scales
    - Configures tooltips and interactions
+   - Retrieves historical data for temporal charts
 
 ## 📈 Value Formatting
 
@@ -115,6 +164,18 @@ The widget automatically formats values based on item units:
 - Responsive and always visible tooltips
 - Smooth interactions and animations
 - Responsive layout that adapts to widget size
+
+## ⏰ Temporal Charts Features
+
+- **Native Zabbix Integration**: Uses Zabbix's History API for data retrieval and `CWidgetFieldTimePeriod` for time management
+- **Dashboard Time Filter Integration**: Seamlessly works with dashboard time filters and global time settings
+- **Time Period Display**: Shows current time period in widget header with visual indicator
+- **Performance Optimized**: Efficient data loading with configurable limits (max 1000 points per item)
+- **Real-time Updates**: Automatic refresh following widget refresh intervals
+- **Multi-item Support**: Display multiple items on the same temporal chart with distinct colors
+- **Interactive Navigation**: Zoom, pan, and tooltip interactions with ECharts
+- **Responsive Design**: Adapts to different widget sizes and screen resolutions
+- **Professional Time Formatting**: Consistent with other Zabbix time-based widgets
 
 ## 🤝 Contributing
 

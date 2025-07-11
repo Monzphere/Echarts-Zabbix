@@ -4,7 +4,7 @@
 	"type": "widget",
 	"name": "ECharts Widget",
 	"namespace": "EchartsWidget",
-	"version": "1.3",
+	"version": "2.0",
 	"author": "Monzphere.com",
 	"url": "monzphere.com",
 	"actions": {
@@ -16,7 +16,6 @@
 		"js_class": "WidgetEcharts"
 	},
 	"assets": {
-		"css": ["widget.css"],
-		"js": ["echarts.min.js", "echarts-liquidfill.min.js", "class.widget.js"]
+		"js": ["echarts.min.js", "echarts-liquidfill.min.js", "class.widget.js","colorpickermonz.js"]
 	}
 }

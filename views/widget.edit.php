@@ -54,10 +54,10 @@ if (array_key_exists('display_type', $data['fields'])) {
 	$form->addField($display_type_field);
 }
 
-// Adiciona o campo de tema de cores
-if (array_key_exists('color_theme', $data['fields'])) {
+// Adiciona o campo de cor - sempre incluir
+if (array_key_exists('value_color', $data['fields'])) {
 	$form->addField(
-		new CWidgetFieldSelectView($data['fields']['color_theme'])
+		new CWidgetFieldColorView($data['fields']['value_color'])
 	);
 }
 
@@ -94,4 +94,34 @@ if (array_key_exists('unit_type', $data['fields'])) {
 		new CWidgetFieldSelectView($data['fields']['unit_type'])
 	);
 }
+
+// Adiciona campos específicos para gráficos temporais
+if (array_key_exists('time_period', $data['fields'])) {
+	$form->addField(
+		(new CWidgetFieldTimePeriodView($data['fields']['time_period']))
+			->setDateFormat(ZBX_FULL_DATE_TIME)
+			->setFromPlaceholder(_('YYYY-MM-DD hh:mm:ss'))
+			->setToPlaceholder(_('YYYY-MM-DD hh:mm:ss'))
+	);
+}
+
+if (array_key_exists('show_legend', $data['fields'])) {
+	$form->addField(
+		new CWidgetFieldCheckBoxView($data['fields']['show_legend'])
+	);
+}
+
+if (array_key_exists('show_grid', $data['fields'])) {
+	$form->addField(
+		new CWidgetFieldCheckBoxView($data['fields']['show_grid'])
+	);
+}
+
+if (array_key_exists('smooth_lines', $data['fields'])) {
+	$form->addField(
+		new CWidgetFieldCheckBoxView($data['fields']['smooth_lines'])
+	);
+}
+
 $form->show();
+
