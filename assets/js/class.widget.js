@@ -1263,7 +1263,7 @@ class WidgetEcharts extends CWidget {
                 splitNumber: 5,
                 axisLine: {
                     lineStyle: {
-                        width: 3,
+                        width: 10,
                         color: [
                             [0.3, '#91cc75'],  // 0-30% verde
                             [0.7, '#fac858'],  // 30-70% amarelo
@@ -1273,7 +1273,7 @@ class WidgetEcharts extends CWidget {
                 },
                 pointer: {
                     icon: 'path://M12.8,0.7l12,40.1H0.7L12.8,0.7z',
-                    length: '45%',
+                    length: '85%',
                     width: 4,
                     offsetCenter: [0, 0],
                     itemStyle: {
@@ -1298,8 +1298,8 @@ class WidgetEcharts extends CWidget {
                 },
                 axisLabel: {
                     color: '#999',
-                    distance: -16,
-                    fontSize: 8,
+                    distance: -28,
+                    fontSize: 12,
                     formatter: (value) => {
                         return value + '%';
                     }
@@ -1314,14 +1314,14 @@ class WidgetEcharts extends CWidget {
                 },
                 title: {
                     show: true,
-                    offsetCenter: [0, '30%'],
-                    fontSize: 10,
+                    offsetCenter: [0, '40%'],
+                    fontSize: 20,
                     color: '#999'
                 },
                 detail: {
                     valueAnimation: true,
-                    fontSize: 16,
-                    offsetCenter: [0, '8%'],
+                    fontSize: 20,
+                    offsetCenter: [0, '15%'],
                     formatter: (value) => {
                         return value.toFixed(2) + '%';
                     },
