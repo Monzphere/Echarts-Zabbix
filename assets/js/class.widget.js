@@ -391,8 +391,7 @@ class WidgetEcharts extends CWidget {
                     options = this._createGaugeChart(data);
                     break;
                 case WidgetEcharts.DISPLAY_TYPE_LIQUID:
-                    
-                    options = this._createGaugeChart(data);
+                    options = this._createLiquidChart(data);
                     break;
                 case WidgetEcharts.DISPLAY_TYPE_PIE:
                     options = this._createPieChart(data);
@@ -461,16 +460,7 @@ class WidgetEcharts extends CWidget {
             }
 
             // Atualiza o gráfico com as novas opções
-            
             this._chart.setOption(finalOptions, true);
-            
-            // Log para verificar se o chart foi atualizado corretamente
-            setTimeout(() => {
-                
-                if (displayType === WidgetEcharts.DISPLAY_TYPE_LIQUID) {
-                    
-                }
-            }, 100);
             
             // Reregistra os eventos necessários
             this._chart.on('click', (params) => {
@@ -1335,11 +1325,78 @@ class WidgetEcharts extends CWidget {
         };
     }
 
-    // _createLiquidChart - Temporarily disabled
-    // LiquidFill plugin causes rendering issues, using gauge chart as fallback
     _createLiquidChart(data) {
+        const fields = data.fields;
+        if (!fields || !fields.length) return null;
         
-        return this._createGaugeChart(data);
+        const field = fields[0];
+        const value = parseFloat(field.value);
+        
+        if (isNaN(value)) return null;
+        
+        // Determinar a cor do tema atual (dark-theme=#2b2b2b ou blue-theme=#ffffff)
+        const isDarkTheme = document.body.classList.contains('dark-theme');
+        const textColor = isDarkTheme ? '#ffffff' : '#000000';
+        
+        // Normalizar o valor para 0-1 (para porcentagens) ou calcular baseado na unidade
+        let normalizedValue = value;
+        const units = field.units || '';
+        
+        // Se for porcentagem, dividir por 100
+        if (units === '%' || units.includes('%')) {
+            normalizedValue = value / 100;
+        } else {
+            // Para outros tipos, assumir que está entre 0-100
+            normalizedValue = Math.min(Math.max(value / 100, 0), 1);
+        }
+        
+        // Usar a cor selecionada na configuração ou cor padrão baseada no valor
+        const primaryColor = this._getPrimaryColor();
+        const liquidColor = primaryColor ? primaryColor : this._getColorByValue(value, 0, 100);
+        
+        return {
+            // Não definir backgroundColor aqui - deixar o CSS controlar
+            series: [{
+                type: 'liquidFill',
+                data: [normalizedValue],
+                radius: '80%',
+                center: ['50%', '50%'],
+                color: [liquidColor],
+                backgroundStyle: {
+                    color: isDarkTheme ? '#363636' : '#f5f5f5'
+                },
+                outline: {
+                    show: true,
+                    borderDistance: 8,
+                    itemStyle: {
+                        borderWidth: 8,
+                        borderColor: liquidColor,
+                        shadowBlur: 20,
+                        shadowColor: 'rgba(0, 0, 0, 0.25)'
+                    }
+                },
+                label: {
+                    show: true,
+                    color: textColor,
+                    insideColor: '#fff',
+                    fontSize: 50,
+                    fontWeight: 'bold',
+                    formatter: () => {
+                        return this._formatValueWithUnits(value, units);
+                    }
+                },
+                itemStyle: {
+                    opacity: 0.95,
+                    shadowBlur: 50,
+                    shadowColor: 'rgba(0, 0, 0, 0.4)'
+                },
+                emphasis: {
+                    itemStyle: {
+                        opacity: 0.8
+                    }
+                }
+            }]
+        };
     }
 
     _createPieChart(data) {
@@ -2464,10 +2521,11 @@ class WidgetEcharts extends CWidget {
         }
     }
 
-    // _isLiquidFillAvailable - Temporarily disabled
-    // LiquidFill plugin availability check removed
     _isLiquidFillAvailable() {
-        return false; // Always return false to disable liquidFill
+        // Check if echarts-liquidfill plugin is loaded
+        return typeof echarts !== 'undefined' && 
+               typeof echarts.graphic !== 'undefined' && 
+               typeof echarts.extendSeriesModel === 'function';
     }
 
     _getResourceColor(value) {
