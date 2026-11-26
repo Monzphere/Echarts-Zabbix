@@ -827,6 +827,18 @@ class WidgetEcharts extends CWidget {
         return thresholds[thresholds.length - 1].color;
     }
 
+    _escapeHtml(value) {
+        if (value === null || value === undefined) {
+            return '';
+        }
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     _formatValueWithUnits(value, units) {
         try {
             if (value === null || value === undefined) {
@@ -1010,7 +1022,7 @@ class WidgetEcharts extends CWidget {
             },
             tooltip: {
                 trigger: 'item',
-                formatter: params => `${params.name}: ${this._formatValueWithUnits(params.value, params.data.units)}`
+                formatter: params => `${this._escapeHtml(params.name)}: ${this._escapeHtml(this._formatValueWithUnits(params.value, params.data.units))}`
             },
             xAxis: {
                 type: 'value',
@@ -1195,10 +1207,16 @@ class WidgetEcharts extends CWidget {
                 row.onmouseover = () => row.style.backgroundColor = isDarkTheme ? '#2f3236' : '#f2f4f5';
                 row.onmouseout = () => row.style.backgroundColor = 'transparent';
                 
-                row.innerHTML = `
-                    <td style="text-align: left; padding: 8px;">${item.name}</td>
-                    <td style="text-align: right; padding: 8px;">${this._formatValueWithUnits(item.value, item.units)}</td>
-                `;
+                const nameCell = document.createElement('td');
+                nameCell.style.cssText = 'text-align: left; padding: 8px;';
+                nameCell.textContent = item.name;
+
+                const valueCell = document.createElement('td');
+                valueCell.style.cssText = 'text-align: right; padding: 8px;';
+                valueCell.textContent = this._formatValueWithUnits(item.value, item.units);
+
+                row.appendChild(nameCell);
+                row.appendChild(valueCell);
                 tbody.appendChild(row);
             }
         });
@@ -1232,7 +1250,7 @@ class WidgetEcharts extends CWidget {
         return {
             tooltip: {
                 formatter: (params) => {
-                    return `${field.name}: ${value.toFixed(2)}${field.units || ''}`;
+                    return `${this._escapeHtml(field.name)}: ${value.toFixed(2)}${this._escapeHtml(field.units || '')}`;
                 }
             },
             grid: {
@@ -1434,7 +1452,7 @@ class WidgetEcharts extends CWidget {
                         if (params.name === 'Remaining') {
                             return 'Remaining: ' + remaining.toFixed(2) + '%';
                         }
-                        return `${params.name}: ${this._formatValueWithUnits(params.value, item.units)}`;
+                        return `${this._escapeHtml(params.name)}: ${this._escapeHtml(this._formatValueWithUnits(params.value, item.units))}`;
                     }
                 },
                 legend: {
@@ -1480,9 +1498,9 @@ class WidgetEcharts extends CWidget {
                 formatter: (params) => {
                     const item = chartData.find(i => i.name === params.name);
                     if (item) {
-                        return `${params.name}: ${this._formatValueWithUnits(params.value, item.units)}`;
+                        return `${this._escapeHtml(params.name)}: ${this._escapeHtml(this._formatValueWithUnits(params.value, item.units))}`;
                     }
-                    return `${params.name}: ${params.value}`;
+                    return `${this._escapeHtml(params.name)}: ${this._escapeHtml(params.value)}`;
                 }
             },
             legend: {
@@ -1617,9 +1635,9 @@ class WidgetEcharts extends CWidget {
                     
                     return [
                         '<div style="font-weight: bold; margin-bottom: 5px;">' +
-                        treePath.join(' / ') +
+                        treePath.map(name => this._escapeHtml(name)).join(' / ') +
                         '</div>',
-                        'Valor: ' + formattedValue
+                        'Valor: ' + this._escapeHtml(formattedValue)
                     ].join('');
                 }
             },
@@ -1742,7 +1760,7 @@ class WidgetEcharts extends CWidget {
                 trigger: 'item',
                 formatter: params => {
                     const item = items.find(i => i.name === params.name);
-                    if (!item) return params.name;
+                    if (!item) return this._escapeHtml(params.name);
 
                     let value = this._formatValueWithUnits(params.value, item.units);
                     let unitSuffix = '';
@@ -1761,7 +1779,7 @@ class WidgetEcharts extends CWidget {
                         }
                     }
 
-                    return `${params.name}: ${value} ${unitSuffix}`;
+                    return `${this._escapeHtml(params.name)}: ${this._escapeHtml(value)} ${this._escapeHtml(unitSuffix)}`;
                 }
             },
             toolbox: {
@@ -2271,9 +2289,9 @@ class WidgetEcharts extends CWidget {
                 formatter: (params) => {
                     const item = chartData.find(i => i.name === params.name);
                     if (item) {
-                        return `${params.name}: ${this._formatValueWithUnits(params.value, item.units)}`;
+                        return `${this._escapeHtml(params.name)}: ${this._escapeHtml(this._formatValueWithUnits(params.value, item.units))}`;
                     }
-                    return `${params.name}: ${params.value}`;
+                    return `${this._escapeHtml(params.name)}: ${this._escapeHtml(params.value)}`;
                 }
             },
             legend: {
@@ -2883,10 +2901,10 @@ class WidgetEcharts extends CWidget {
                         overflow: hidden;
                     `;
                     stats.innerHTML = `
-                        <span>L: ${item.stats.last}</span>
-                        <span>Min: ${item.stats.min}</span>
-                        <span>Max: ${item.stats.max}</span>
-                        <span>Avg: ${item.stats.avg}</span>
+                        <span>L: ${this._escapeHtml(item.stats.last)}</span>
+                        <span>Min: ${this._escapeHtml(item.stats.min)}</span>
+                        <span>Max: ${this._escapeHtml(item.stats.max)}</span>
+                        <span>Avg: ${this._escapeHtml(item.stats.avg)}</span>
                     `;
                 } else {
                     stats.style.cssText = `
@@ -2897,10 +2915,10 @@ class WidgetEcharts extends CWidget {
                         line-height: 1.1;
                     `;
                     stats.innerHTML = `
-                        <span>Last: ${item.stats.last}</span>
-                        <span>Min: ${item.stats.min}</span>
-                        <span>Max: ${item.stats.max}</span>
-                        <span>Avg: ${item.stats.avg}</span>
+                        <span>Last: ${this._escapeHtml(item.stats.last)}</span>
+                        <span>Min: ${this._escapeHtml(item.stats.min)}</span>
+                        <span>Max: ${this._escapeHtml(item.stats.max)}</span>
+                        <span>Avg: ${this._escapeHtml(item.stats.avg)}</span>
                     `;
                 }
 
@@ -3146,7 +3164,7 @@ class WidgetEcharts extends CWidget {
                         
                         tooltip += `<div style="color: #fff; margin: 2px 0;">
                             <span style="display:inline-block;margin-right:8px;border-radius:50%;width:8px;height:8px;background-color:${param.color};"></span>
-                            <span style="font-weight: 500;">${param.seriesName}:</span> <span style="float: right; margin-left: 10px;">${formattedValue}</span>
+                            <span style="font-weight: 500;">${this._escapeHtml(param.seriesName)}:</span> <span style="float: right; margin-left: 10px;">${this._escapeHtml(formattedValue)}</span>
                         </div>`;
                     });
                     
@@ -3436,7 +3454,7 @@ class WidgetEcharts extends CWidget {
                         
                         tooltip += `<div style="color: #fff; margin: 2px 0;">
                             <span style="display:inline-block;margin-right:8px;border-radius:50%;width:8px;height:8px;background-color:${param.color};"></span>
-                            <span style="font-weight: 500;">${param.seriesName}:</span> <span style="float: right; margin-left: 10px;">${formattedValue}</span>
+                            <span style="font-weight: 500;">${this._escapeHtml(param.seriesName)}:</span> <span style="float: right; margin-left: 10px;">${this._escapeHtml(formattedValue)}</span>
                         </div>`;
                     });
                     
@@ -3715,7 +3733,7 @@ class WidgetEcharts extends CWidget {
                         
                         tooltip += `<div style="color: #fff; margin: 2px 0;">
                             <span style="display:inline-block;margin-right:8px;border-radius:50%;width:8px;height:8px;background-color:${param.color};"></span>
-                            <span style="font-weight: 500;">${param.seriesName}:</span> <span style="float: right; margin-left: 10px;">${formattedValue}</span>
+                            <span style="font-weight: 500;">${this._escapeHtml(param.seriesName)}:</span> <span style="float: right; margin-left: 10px;">${this._escapeHtml(formattedValue)}</span>
                         </div>`;
                     });
                     
@@ -4001,13 +4019,13 @@ class WidgetEcharts extends CWidget {
                             }
                         }
                         
-                        return `<div style="font-weight: bold; margin-bottom: 4px;">${params.data.name} ${badge}</div>` +
-                               `<div style="margin-bottom: 2px;"><strong>Host:</strong> ${params.data.host || 'Unknown'}</div>` +
-                               `<div><strong>Value:</strong> ${this._formatValueWithUnits(value, field.units)}</div>`;
+                        return `<div style="font-weight: bold; margin-bottom: 4px;">${this._escapeHtml(params.data.name)} ${badge}</div>` +
+                               `<div style="margin-bottom: 2px;"><strong>Host:</strong> ${this._escapeHtml(params.data.host || 'Unknown')}</div>` +
+                               `<div><strong>Value:</strong> ${this._escapeHtml(this._formatValueWithUnits(value, field.units))}</div>`;
                     }
-                    return `<div style="font-weight: bold;">${params.data.name}</div>` +
-                           `<div><strong>Host:</strong> ${params.data.host || 'Unknown'}</div>` +
-                           `<div><strong>Value:</strong> ${params.data.value[1]}</div>`;
+                    return `<div style="font-weight: bold;">${this._escapeHtml(params.data.name)}</div>` +
+                           `<div><strong>Host:</strong> ${this._escapeHtml(params.data.host || 'Unknown')}</div>` +
+                           `<div><strong>Value:</strong> ${this._escapeHtml(params.data.value[1])}</div>`;
                 }
             },
             legend: {

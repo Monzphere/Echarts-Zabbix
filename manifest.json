@@ -4,7 +4,7 @@
 	"type": "widget",
 	"name": "ECharts Widget",
 	"namespace": "EchartsWidget",
-	"version": "2.0",
+	"version": "2.0.1",
 	"author": "Monzphere.com",
 	"url": "monzphere.com",
 	"actions": {
