@@ -1558,22 +1558,22 @@ class WidgetEcharts extends CWidget {
         
         // Group items by host if available
         const treeData = [];
-        const hostGroups = {};
-        
+        const hostGroups = new Map();
+
         // First, group by host
         items.forEach(item => {
             const host = item.host || 'Unknown';
-            if (!hostGroups[host]) {
-                hostGroups[host] = {
+            if (!hostGroups.has(host)) {
+                hostGroups.set(host, {
                     name: host,
                     children: []
-                };
-                treeData.push(hostGroups[host]);
+                });
+                treeData.push(hostGroups.get(host));
             }
-            
+
             // Add item to host group with appropriate value formatting
             const value = Math.abs(parseFloat(item.value));
-            hostGroups[host].children.push({
+            hostGroups.get(host).children.push({
                 name: item.name.replace('Container /', ''), // Remove o prefixo "Container /" para melhor visualização
                 value: value,
                 itemId: item.id,
@@ -1686,7 +1686,7 @@ class WidgetEcharts extends CWidget {
                         // Para retângulos maiores, mostra nome e valor
                         return name + '\n' + value;
                     },
-                    ellipsis: true,
+                    ellipsis: '...',
                     fontSize: 11,
                     color: '#fff',
                     rich: {
